@@ -190,17 +190,22 @@ function address(src, prefix = '') {
     name: clean(src[prefix + 'name'], 120), street: clean(src[prefix + 'street'], 200), city: clean(src[prefix + 'city'], 100),
     zip: clean(src[prefix + 'zip'], 12), country: ['SK', 'CZ'].includes(src[prefix + 'country']) ? src[prefix + 'country'] : ''
   };
+  a.zip = a.zip.replace(/[\s-]/g, '');
+  if (/^\d{5}$/.test(a.zip)) a.zip = `${a.zip.slice(0, 3)} ${a.zip.slice(3)}`; // SK/CZ format "811 02"
   const missing = ['name', 'street', 'city', 'zip', 'country'].filter(k => !a[k]).map(k => prefix + k);
-  if (a.zip && !/^[0-9 ]{4,8}$/.test(a.zip)) missing.push(prefix + 'zip');
+  if (a.zip && !/^\d{3} \d{2}$/.test(a.zip)) missing.push(prefix + 'zip');
   return { a, missing };
 }
 app.post('/api/order-request', limit('orderreq', 10, 10 * 60_000), noStore, wrap(async (req, res) => {
   const b = req.body && typeof req.body === 'object' ? req.body : {};
   const bill = address(b);
-  const email = clean(b.email, 254).toLowerCase(), phone = clean(b.phone, 30), company = clean(b.company, 120), note = clean(b.note, 500);
+  const email = clean(b.email, 254).toLowerCase(), company = clean(b.company, 120), note = clean(b.note, 500);
+  // phone: accept any common formatting, store digits with an optional leading +
+  let phone = clean(b.phone, 30).replace(/[\s().\/-]/g, '');
+  if (phone.startsWith('00')) phone = '+' + phone.slice(2);
   const missing = [...bill.missing];
   if (!EMAIL.test(email)) missing.push('email');
-  if (!/^\+?[0-9 ()/-]{6,20}$/.test(phone)) missing.push('phone');
+  if (!/^\+?\d{6,15}$/.test(phone)) missing.push('phone');
   const ship = b.ship_different === true ? address(b, 'ship_') : null;
   if (ship) missing.push(...ship.missing);
   if (b.terms !== true) missing.push('terms');

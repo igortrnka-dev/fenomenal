@@ -4,29 +4,41 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
-  <title>Fenomenal Admin</title>
+  <meta name="theme-color" content="#fafafa">
+  <title>Admin — FENOMENAL</title>
+  <link rel="preload" href="fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="admin.css">
 </head>
 <body>
+  <div class="grid-lines" aria-hidden="true"><i></i><i></i><i></i></div>
+
   <section id="login" class="login">
-    <form id="loginForm">
-      <h1>Fenomenal<small>admin</small></h1>
-      <input id="email" type="email" placeholder="Email" autocomplete="username" required>
-      <input id="password" type="password" placeholder="Heslo" autocomplete="current-password" required>
+    <form id="loginForm" class="card login-card">
+      <p class="label"><i></i>Administrácia</p>
+      <h1>FENOMENAL®</h1>
+      <label>E-mail<input id="email" type="email" autocomplete="username" required></label>
+      <label>Heslo<input id="password" type="password" autocomplete="current-password" required></label>
       <button class="btn" type="submit">Prihlásiť</button>
       <p id="loginErr" class="err" role="alert"></p>
     </form>
   </section>
 
   <div id="app" hidden>
-    <aside>
-      <h2>Fenomenal</h2>
-      <nav id="tabs"></nav>
-      <button id="logout" class="link">Odhlásiť</button>
+    <aside class="side">
+      <a class="logo" href="#">FENOMENAL®</a>
+      <p class="label light"><i></i>Obsah webu</p>
+      <nav id="tabs" aria-label="Sekcie"></nav>
+      <button id="logout" class="link" type="button">Odhlásiť sa</button>
     </aside>
-    <main>
-      <header><h1 id="title"></h1><button id="addBtn" class="btn">+ Pridať</button></header>
-      <table id="table"></table>
+    <main class="content">
+      <header class="content-head">
+        <div>
+          <p class="label"><i></i>Admin</p>
+          <h1 id="title"></h1>
+        </div>
+        <button id="addBtn" class="btn" type="button">+ Pridať</button>
+      </header>
+      <div class="table-wrap"><table id="table"></table></div>
     </main>
   </div>
 

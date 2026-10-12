@@ -51,9 +51,10 @@ async function select(k) {
 }
 function render() {
   const s = SCHEMA[cur];
-  $('#table').innerHTML = `<tr>${s.cols.map(c => `<th>${c}</th>`).join('')}<th></th></tr>` + rows.map(r => `
+  const colLabel = c => (s.fields.find(f => f[0] === c) || [, c])[1].replace(/\s*\(.*\)$/, '');
+  $('#table').innerHTML = `<tr>${s.cols.map(c => `<th>${esc(colLabel(c))}</th>`).join('')}<th></th></tr>` + rows.map(r => `
     <tr class="${r.published ? '' : 'off'}">${s.cols.map(c => `<td>${IMG_COLS.has(c) ? `<img src="${esc(imgSrc(r[c]))}" alt="">` : esc(r[c])}</td>`).join('')}
-    <td class="act"><button class="btn ghost" data-a="pub" data-id="${r.id}">${r.published ? 'Skryť' : 'Zobraziť'}</button><button class="btn ghost" data-a="edit" data-id="${r.id}">Upraviť</button><button class="btn ghost" data-a="del" data-id="${r.id}">✕</button></td></tr>`).join('');
+    <td class="act"><button class="btn ghost" data-a="pub" data-id="${r.id}">${r.published ? 'Skryť' : 'Zobraziť'}</button><button class="btn ghost" data-a="edit" data-id="${r.id}">Upraviť</button><button class="btn ghost danger" data-a="del" data-id="${r.id}" aria-label="Zmazať">✕</button></td></tr>`).join('');
 }
 $('#table').onclick = async e => {
   const b = e.target.closest('button'); if (!b) return;
@@ -78,6 +79,7 @@ function openForm(r) {
   }).join('') + `<label class="chk"><input type="checkbox" name="published" ${!r || r.published ? 'checked' : ''}> Zverejnené</label>
     <p id="formErr" class="err"></p>
     <div class="row"><button type="button" class="btn ghost" id="cancel">Zrušiť</button><button class="btn" id="save">Uložiť</button></div>`;
+  f.insertAdjacentHTML('afterbegin', `<p class="label"><i></i>${esc(s.label)}</p><h2 class="form-title">${r ? 'Upraviť' : 'Pridať'}</h2>`);
   $('#dlg').showModal();
   $('#cancel').onclick = () => $('#dlg').close();
 }

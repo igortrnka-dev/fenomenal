@@ -357,6 +357,19 @@ $('#shopGrid').innerHTML = PRODUCTS.map(p => `
 
 const coDlg = $('#checkoutDlg'), coForm = $('#coForm');
 const coErr = msg => { $('#coError').textContent = msg || ''; };
+const CO_LABELS = { name: 'meno', email: 'e-mail', phone: 'telefón', street: 'ulica', zip: 'PSČ', city: 'mesto', country: 'krajina',
+  ship_name: 'meno príjemcu', ship_street: 'doručovacia ulica', ship_zip: 'doručovacie PSČ', ship_city: 'doručovacie mesto', ship_country: 'doručovacia krajina',
+  terms: 'súhlas so zásadami' };
+// mark the bad fields, name them in the message and bring the first one into view
+function coInvalid(keys, prefix) {
+  const f = coForm.elements;
+  keys.forEach(k => f[k]?.classList.add('invalid'));
+  const names = [...new Set(keys)].map(k => CO_LABELS[k] || k);
+  coErr(`${prefix}: ${names.join(', ')}.`);
+  const first = f[keys[0]];
+  if (first) { first.scrollIntoView({ block: 'center', behavior: 'smooth' }); first.focus({ preventScroll: true }); }
+}
+coForm.addEventListener('input', e => { e.target.classList?.remove('invalid'); });
 let coProduct = null;
 $('#shopGrid').addEventListener('click', e => {
   if (!e.target.closest('.order-btn')) return;
@@ -383,7 +396,7 @@ coForm.addEventListener('submit', async e => {
   const req = ['name', 'email', 'phone', 'street', 'zip', 'city', ...(data.ship_different ? ['ship_name', 'ship_street', 'ship_zip', 'ship_city'] : [])];
   const empty = req.filter(k => !String(data[k] || '').trim());
   if (!data.terms) empty.push('terms');
-  if (empty.length) { empty.forEach(k => f[k]?.classList.add('invalid')); f[empty[0]]?.focus(); return coErr('Vyplň prosím zvýraznené údaje.'); }
+  if (empty.length) return coInvalid(empty, 'Doplň prosím');
   const btn = $('#coSubmit'); btn.disabled = true; coErr('Ukladám objednávku…');
   try {
     const r = await fetch(`${API}/api/order-request`, {
@@ -391,7 +404,7 @@ coForm.addEventListener('submit', async e => {
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) {
-      (d.missing || []).forEach(k => f[k]?.classList.add('invalid'));
+      if (r.status === 400 && d.missing?.length) { btn.disabled = false; return coInvalid(d.missing, 'Skontroluj prosím'); }
       throw new Error(r.status < 500 && d.error ? d.error : 'Objednávku sa nepodarilo uložiť. Skús to prosím o chvíľu znova.');
     }
     if (!isStripeLink(d.url)) throw new Error('Platbu sa nepodarilo spustiť.');
