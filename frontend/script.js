@@ -201,7 +201,9 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const get = r => fetch(`${API}/api/${r}`, { signal: AbortSignal.timeout(3000) }).then(x => x.ok ? x.json() : Promise.reject(x.status));
 if (API) {
   const [pl, pr, me] = await Promise.allSettled(['playlists', 'products', 'members'].map(get));
-  if (pl.status === 'fulfilled' && pl.value.length) PLAYLISTS = pl.value.map(p => ({ title: p.title, sub: p.sub, type: p.type, id: p.spotify_id }));
+  // only well-formed Spotify entries make it into the embed URL
+  const spotifyOk = p => ['playlist', 'album', 'artist', 'track'].includes(p.type) && /^[A-Za-z0-9]{10,40}$/.test(p.spotify_id || '');
+  if (pl.status === 'fulfilled' && pl.value.filter(spotifyOk).length) PLAYLISTS = pl.value.filter(spotifyOk).map(p => ({ title: p.title, sub: p.sub, type: p.type, id: p.spotify_id }));
   if (pr.status === 'fulfilled' && pr.value.length) PRODUCTS = pr.value.map(p => ({ ...p, price: +p.price, sizes: p.sizes || ['OS'] }));
   if (me.status === 'fulfilled') MEMBERS = me.value;
 }
@@ -317,7 +319,19 @@ PLAYLISTS.forEach((p, i) => {
 loadPlaylist(0);
 
 /* ---------- Shop & cart ---------- */
-let cart = JSON.parse(localStorage.getItem('fen-cart') || '[]');
+// localStorage is user-controlled: keep only well-formed { id, qty } entries
+let cart = (() => {
+  try {
+    const raw = JSON.parse(localStorage.getItem('fen-cart') || '[]');
+    const clean = Array.isArray(raw) ? raw.filter(c => Number.isSafeInteger(c?.id) && Number.isInteger(c?.qty) && c.qty >= 1 && c.qty <= 10).map(c => ({ id: c.id, qty: c.qty })) : [];
+    if (JSON.stringify(clean) !== JSON.stringify(raw)) localStorage.setItem('fen-cart', JSON.stringify(clean));
+    return clean;
+  } catch { localStorage.removeItem('fen-cart'); return []; }
+})();
+// Never navigate to a URL we did not expect (no javascript:, no look-alike domains)
+const onlyOrigin = origin => u => { try { const x = new URL(u); return x.origin === origin && x.username === '' && x.password === ''; } catch { return false; } };
+const STRIPE_CHECKOUT = { test: onlyOrigin('https://checkout.stripe.com') };
+const STRIPE_LINK = { test: onlyOrigin('https://buy.stripe.com') };
 const fmt = n => n + ' €';
 const toast = (msg, ms = 2000) => {
   const t = $('#toast'); t.textContent = msg; t.classList.add('show');
@@ -414,11 +428,11 @@ $('#checkout').onclick = async () => {
       signal: AbortSignal.timeout(20000)
     });
     const d = await r.json().catch(() => ({}));
-    if (r.ok && d.url) { location.href = d.url; return; }
+    if (r.ok && STRIPE_CHECKOUT.test(d.url || '')) { location.href = d.url; return; }
     if (r.status >= 400 && r.status < 500) throw Object.assign(new Error(d.error || 'Objednávku sa nepodarilo spracovať'), { user: true });
     throw new Error(d.error || 'API nedostupné');
   } catch (e) {
-    const link = PRODUCTS.find(p => cart.some(c => c.id === p.id) && p.payment_link)?.payment_link;
+    const link = PRODUCTS.find(p => cart.some(c => c.id === p.id) && STRIPE_LINK.test(p.payment_link || ''))?.payment_link;
     if (!e.user && link) { location.href = link; return; }
     toast(e.user ? e.message : 'Platbu sa teraz nepodarilo spustiť, skús to o chvíľu.', 4000);
     btn.disabled = false;

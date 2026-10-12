@@ -18,31 +18,94 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !SUPABASE_ANON_KEY) {
 }
 
 const db = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { auth: { persistSession: false } });
-const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+const ANON_OPTS = { auth: { persistSession: false, autoRefreshToken: false } };
+const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, ANON_OPTS); // stateless: never holds a user session
 const admins = ADMIN_EMAILS.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
 const origins = CORS_ORIGINS.split(',').map(s => s.trim()).filter(Boolean);
 
-/* Whitelist stĺpcov pre každý zdroj (+ poradie) */
+/* ---------- Validation helpers ---------- */
+const fail = (status, message, extra) => Object.assign(new Error(message), { status, expose: true, ...extra });
+const isStr = v => typeof v === 'string';
+const URL_IMG = /^(https:\/\/[^\s"'<>\\]{1,2000}|img\/[A-Za-z0-9._-]{1,120})$/; // https URL or bundled img/…
+const URL_HTTPS = /^https:\/\/[^\s"'<>\\]{1,2000}$/;
+const STRIPE_LINK = /^https:\/\/buy\.stripe\.com\/[A-Za-z0-9_]{6,100}$/;
+const SPOTIFY_ID = /^[A-Za-z0-9]{10,40}$/;
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+// Per-column rules for admin writes: anything not listed in a resource is dropped, anything malformed is rejected.
+const text = max => v => v === null || (isStr(v) && v.length <= max) ? v : undefined;
+const url = re => v => v === null || (isStr(v) && re.test(v)) ? v : undefined;
+const int = (min, max) => v => v === null || (Number.isInteger(v) && v >= min && v <= max) ? v : undefined;
+const num = (min, max) => v => typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max ? Math.round(v * 100) / 100 : undefined;
+const bool = v => typeof v === 'boolean' ? v : undefined;
+const oneOf = list => v => list.includes(v) ? v : undefined;
+const date = v => v === null || (isStr(v) && DATE.test(v) && !Number.isNaN(Date.parse(v))) ? v : undefined;
+const sizes = v => Array.isArray(v) && v.length <= 20 && v.every(s => isStr(s) && s.length <= 20) ? v : undefined;
+const required = rule => v => v === null || v === '' ? undefined : rule(v);
+
 const RESOURCES = {
-  members:   { fields: ['name', 'bio', 'img', 'sort', 'published'], order: 'sort' },
-  playlists: { fields: ['title', 'sub', 'type', 'spotify_id', 'sort', 'published'], order: 'sort' },
-  events:    { fields: ['title', 'date', 'venue', 'city', 'ticket_url', 'sort', 'published'], order: 'date' },
-  news:      { fields: ['title', 'body', 'date', 'img', 'sort', 'published'], order: 'date', desc: true },
-  products:  { fields: ['name', 'sub', 'price', 'img', 'badge', 'sizes', 'payment_link', 'sort', 'published'], order: 'sort' },
-  gallery:   { fields: ['src', 'cat', 'cap', 'sort', 'published'], order: 'sort' }
+  members:   { order: 'sort', fields: { name: required(text(120)), bio: text(5000), img: url(URL_IMG), sort: int(0, 9999), published: bool } },
+  playlists: { order: 'sort', fields: { title: required(text(200)), sub: text(200), type: oneOf(['playlist', 'album', 'artist', 'track']), spotify_id: required(url(SPOTIFY_ID)), sort: int(0, 9999), published: bool } },
+  events:    { order: 'date', fields: { title: required(text(200)), date: required(date), venue: text(200), city: text(120), ticket_url: url(URL_HTTPS), sort: int(0, 9999), published: bool } },
+  news:      { order: 'date', desc: true, fields: { title: required(text(200)), body: text(10000), date, img: url(URL_IMG), sort: int(0, 9999), published: bool } },
+  products:  { order: 'sort', fields: { name: required(text(120)), sub: text(200), price: num(0, 100000), img: url(URL_IMG), badge: text(40), sizes, payment_link: url(STRIPE_LINK), sort: int(0, 9999), published: bool } },
+  gallery:   { order: 'sort', fields: { src: required(url(URL_IMG)), cat: oneOf(['crew', 'street']), cap: text(120), sort: int(0, 9999), published: bool } }
 };
 
+function validate(body, cfg) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw fail(400, 'Neplatné údaje');
+  const out = {}, bad = [];
+  for (const [k, rule] of Object.entries(cfg.fields)) {
+    if (!(k in body)) continue;
+    let v = body[k];
+    if (isStr(v)) v = v.trim();
+    const ok = rule(v === '' ? null : v);
+    if (ok === undefined) bad.push(k); else out[k] = ok;
+  }
+  if (bad.length) throw fail(400, `Neplatné pole: ${bad.join(', ')}`, { fields: bad });
+  return out;
+}
+
+/* ---------- Rate limiting (in memory, per IP and bucket) ---------- */
+const hits = new Map();
+const limit = (bucket, max, windowMs) => (req, res, next) => {
+  const key = `${bucket}:${req.ip}`, now = Date.now();
+  const h = hits.get(key);
+  if (!h || now > h.reset) { hits.set(key, { n: 1, reset: now + windowMs }); return next(); }
+  if (++h.n > max) {
+    res.set('Retry-After', Math.ceil((h.reset - now) / 1000));
+    return res.status(429).json({ error: 'Príliš veľa pokusov, skús to o chvíľu.' });
+  }
+  next();
+};
+setInterval(() => { const now = Date.now(); for (const [k, h] of hits) if (now > h.reset) hits.delete(k); }, 60_000).unref();
+
+/* ---------- App + security headers ---------- */
 const app = express();
+app.disable('x-powered-by');
+app.set('trust proxy', 1); // Render terminates TLS in front of us → real client IP for rate limits
+app.use((req, res, next) => {
+  res.set({
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'no-referrer',
+    'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
+    'Strict-Transport-Security': 'max-age=63072000; includeSubDomains',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
+    'Cross-Origin-Opener-Policy': 'same-origin'
+  });
+  next();
+});
 
 /* ---------- Stripe webhook (needs the raw body, so it is registered before express.json) ---------- */
 // Stripe → Developers → Webhooks → endpoint https://<api>/api/stripe/webhook, event checkout.session.completed
-app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json', limit: '512kb' }), async (req, res) => {
   if (!stripe || !STRIPE_WEBHOOK_SECRET) return res.status(503).json({ error: 'Webhook nie je nastavený' });
   let event;
   try {
     event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], STRIPE_WEBHOOK_SECRET);
-  } catch (e) {
-    return res.status(400).json({ error: `Neplatný podpis: ${e.message}` });
+  } catch {
+    return res.status(400).json({ error: 'Neplatný podpis' });
   }
   try {
     if (['checkout.session.completed', 'checkout.session.async_payment_succeeded'].includes(event.type)) {
@@ -73,26 +136,35 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
   }
 });
 
-app.use(cors({ origin: origins.length ? origins : true }));
-app.use(express.json({ limit: '1mb' }));
+// No configured origins → no cross-origin access at all (never "allow everyone")
+app.use(cors({
+  origin: origins.length ? origins : false,
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  maxAge: 600
+}));
+app.use(express.json({ limit: '100kb' }));
 
+// Only errors we raised on purpose reach the client; everything else is logged and answered generically
 const wrap = fn => (req, res) => fn(req, res).catch(e => {
+  if (e.expose) return res.status(e.status).json({ error: e.message, ...(e.fields && { missing: e.fields }) });
   console.error(e);
-  res.status(e.status || 500).json({ error: e.message || 'Server error' });
+  res.status(500).json({ error: 'Nastala chyba servera' });
 });
-const pick = (obj, keys) => Object.fromEntries(keys.filter(k => k in obj).map(k => [k, obj[k]]));
+const noStore = (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); };
 const resource = (req, res, next) => {
-  const r = RESOURCES[req.params.res];
-  if (!r) return res.status(404).json({ error: 'Unknown resource' });
+  const r = Object.hasOwn(RESOURCES, req.params.res) ? RESOURCES[req.params.res] : null;
+  if (!r) return res.status(404).json({ error: 'Nenájdené' });
   req.cfg = r; next();
 };
+const idParam = (req, res, next) => /^\d{1,12}$/.test(req.params.id) ? next() : res.status(400).json({ error: 'Neplatné ID' });
 
 /* ---------- Health ---------- */
 app.get('/health', (_, res) => res.json({ ok: true }));
 
 /* ---------- Public ---------- */
 // Read with the anon key: RLS only exposes published rows, so public pages never need the service_role key
-app.get('/api/:res', resource, wrap(async (req, res) => {
+app.get('/api/:res', limit('public', 300, 60_000), resource, wrap(async (req, res) => {
   const { data, error } = await authClient.from(req.params.res).select('*')
     .eq('published', true).order(req.cfg.order, { ascending: !req.cfg.desc });
   if (error) throw error;
@@ -101,19 +173,20 @@ app.get('/api/:res', resource, wrap(async (req, res) => {
 
 /* ---------- Checkout (Stripe) ---------- */
 // Prices always come from the database, never from the browser.
-app.post('/api/checkout', wrap(async (req, res) => {
-  if (!stripe) return res.status(503).json({ error: 'Platby zatiaľ nie sú nastavené' });
-  const wanted = (Array.isArray(req.body?.items) ? req.body.items : [])
-    .map(i => ({ id: Number(i.id), qty: Math.floor(Number(i.qty)) }))
-    .filter(i => Number.isInteger(i.id) && i.qty >= 1 && i.qty <= 10);
-  if (!wanted.length) return res.status(400).json({ error: 'Košík je prázdny' });
+app.post('/api/checkout', limit('checkout', 20, 10 * 60_000), noStore, wrap(async (req, res) => {
+  if (!stripe) throw fail(503, 'Platby zatiaľ nie sú nastavené');
+  const raw = Array.isArray(req.body?.items) ? req.body.items.slice(0, 20) : [];
+  const wanted = raw
+    .map(i => ({ id: Number(i?.id), qty: Number(i?.qty) }))
+    .filter(i => Number.isSafeInteger(i.id) && i.id > 0 && Number.isInteger(i.qty) && i.qty >= 1 && i.qty <= 10);
+  if (!wanted.length) throw fail(400, 'Košík je prázdny');
   const { data: products, error } = await authClient.from('products')
     .select('id, name, sub, price, img').in('id', wanted.map(i => i.id));
   if (error) throw error;
   const line_items = wanted.map(w => {
     const p = products.find(x => x.id === w.id);
-    if (!p) throw Object.assign(new Error('Produkt v košíku už neexistuje'), { status: 400 });
-    const images = SITE_URL.startsWith('https://') && p.img ? [new URL(p.img, SITE_URL + '/').href] : undefined;
+    if (!p) throw fail(400, 'Produkt v košíku už neexistuje');
+    const images = SITE_URL.startsWith('https://') && p.img && URL_IMG.test(p.img) ? [new URL(p.img, SITE_URL + '/').href] : undefined;
     return {
       quantity: w.qty,
       price_data: {
@@ -137,15 +210,17 @@ app.post('/api/checkout', wrap(async (req, res) => {
 
 /* ---------- Shipping details after payment ---------- */
 // The customer comes back from Stripe with ?session_id=… — we verify the payment with Stripe
-// before showing or saving anything, so only paid orders can submit an address.
+// before showing or saving anything, so only paid, recent orders can read or submit an address.
 const SESSION_RE = /^cs_(test|live)_[A-Za-z0-9]{10,200}$/;
+const SESSION_MAX_AGE = 30 * 24 * 60 * 60; // seconds
 async function paidSession(id) {
-  if (!stripe) throw Object.assign(new Error('Platby zatiaľ nie sú nastavené'), { status: 503 });
-  if (!SESSION_RE.test(id || '')) throw Object.assign(new Error('Neplatná objednávka'), { status: 400 });
+  if (!stripe) throw fail(503, 'Platby zatiaľ nie sú nastavené');
+  if (!SESSION_RE.test(id || '')) throw fail(400, 'Neplatná objednávka');
   let s;
   try { s = await stripe.checkout.sessions.retrieve(id); }
-  catch { throw Object.assign(new Error('Objednávka sa nenašla'), { status: 404 }); }
-  if (s.payment_status !== 'paid') throw Object.assign(new Error('Objednávka zatiaľ nie je zaplatená'), { status: 409 });
+  catch { throw fail(404, 'Objednávka sa nenašla'); }
+  if (s.payment_status !== 'paid') throw fail(409, 'Objednávka zatiaľ nie je zaplatená');
+  if (Date.now() / 1000 - s.created > SESSION_MAX_AGE) throw fail(410, 'Objednávka je príliš stará, napíš nám prosím');
   return s;
 }
 const fromStripe = s => {
@@ -156,7 +231,7 @@ const fromStripe = s => {
     city: a.city || '', zip: a.postal_code || '', country: a.country || 'SK', phone: s.customer_details?.phone || '' };
 };
 
-app.get('/api/order/:session', wrap(async (req, res) => {
+app.get('/api/order/:session', limit('order', 30, 10 * 60_000), noStore, wrap(async (req, res) => {
   const s = await paidSession(req.params.session);
   const { data: saved } = await db.from('orders').select('shipping').eq('stripe_session_id', s.id).maybeSingle();
   res.json({
@@ -168,19 +243,20 @@ app.get('/api/order/:session', wrap(async (req, res) => {
   });
 }));
 
-app.post('/api/order/:session/shipping', wrap(async (req, res) => {
+app.post('/api/order/:session/shipping', limit('order', 30, 10 * 60_000), noStore, wrap(async (req, res) => {
   const s = await paidSession(req.params.session);
   const b = req.body || {};
-  const str = (v, max) => String(v ?? '').trim().slice(0, max);
+  // strip control characters, trim, cap length
+  const str = (v, max) => (isStr(v) ? v : '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max);
   const shipping = {
     name: str(b.name, 120), street: str(b.street, 200), city: str(b.city, 100),
     zip: str(b.zip, 12).replace(/\s+/g, ' '), country: ['SK', 'CZ'].includes(b.country) ? b.country : '',
     phone: str(b.phone, 30), note: str(b.note, 500), confirmed: true, confirmed_at: new Date().toISOString()
   };
   const missing = ['name', 'street', 'city', 'zip', 'country', 'phone'].filter(k => !shipping[k]);
-  if (missing.length) return res.status(400).json({ error: 'Vyplň všetky povinné údaje', missing });
-  if (!/^[0-9 ]{4,8}$/.test(shipping.zip)) return res.status(400).json({ error: 'Neplatné PSČ', missing: ['zip'] });
-  if (!/^\+?[0-9 ()/-]{6,20}$/.test(shipping.phone)) return res.status(400).json({ error: 'Neplatné telefónne číslo', missing: ['phone'] });
+  if (missing.length) throw fail(400, 'Vyplň všetky povinné údaje', { fields: missing });
+  if (!/^[0-9 ]{4,8}$/.test(shipping.zip)) throw fail(400, 'Neplatné PSČ', { fields: ['zip'] });
+  if (!/^\+?[0-9 ()/-]{6,20}$/.test(shipping.phone)) throw fail(400, 'Neplatné telefónne číslo', { fields: ['phone'] });
   const { data: lines } = await stripe.checkout.sessions.listLineItems(s.id, { limit: 100 });
   const { error } = await db.from('orders').upsert({
     stripe_session_id: s.id, status: 'paid',
@@ -193,54 +269,80 @@ app.post('/api/order/:session/shipping', wrap(async (req, res) => {
 }));
 
 /* ---------- Auth ---------- */
-app.post('/api/auth/login', wrap(async (req, res) => {
+app.post('/api/auth/login', limit('login', 5, 15 * 60_000), noStore, wrap(async (req, res) => {
   const { email, password } = req.body || {};
-  const { data, error } = await authClient.auth.signInWithPassword({ email, password });
-  if (error || !admins.includes((data.user.email || '').toLowerCase()))
-    return res.status(401).json({ error: 'Neplatné prihlásenie' });
+  if (!isStr(email) || !isStr(password) || email.length > 254 || password.length > 200) throw fail(400, 'Neplatné prihlásenie');
+  const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, ANON_OPTS); // one-off client per login
+  const { data, error } = await client.auth.signInWithPassword({ email, password });
+  if (error || !admins.includes((data.user?.email || '').toLowerCase())) {
+    if (data?.session) await client.auth.signOut().catch(() => {}); // a valid non-admin account gets nothing
+    throw fail(401, 'Neplatné prihlásenie');
+  }
   res.json({ token: data.session.access_token, email: data.user.email });
 }));
 
+// Verified against Supabase Auth on every request (expired/revoked tokens fail), then checked against ADMIN_EMAILS
 const adminOnly = (req, res, next) => {
-  const token = (req.headers.authorization || '').replace(/^Bearer /, '');
-  db.auth.getUser(token).then(({ data, error }) => {
+  const m = /^Bearer ([A-Za-z0-9._-]{20,4096})$/.exec(req.headers.authorization || '');
+  if (!m) return res.status(401).json({ error: 'Unauthorized' });
+  authClient.auth.getUser(m[1]).then(({ data, error }) => {
     if (error || !data.user || !admins.includes((data.user.email || '').toLowerCase()))
       return res.status(401).json({ error: 'Unauthorized' });
     next();
   }).catch(() => res.status(401).json({ error: 'Unauthorized' }));
 };
+app.use('/api/admin', limit('admin', 300, 5 * 60_000), noStore, adminOnly);
 
 /* ---------- Admin ---------- */
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
-app.post('/api/admin/upload', adminOnly, upload.single('file'), wrap(async (req, res) => {
-  if (!req.file || !req.file.mimetype.startsWith('image/'))
-    return res.status(400).json({ error: 'Očakáva sa obrázok' });
-  const ext = (req.file.originalname.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const path = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
-  const { error } = await db.storage.from('media').upload(path, req.file.buffer, { contentType: req.file.mimetype });
+// Only raster images; the real type is read from the file's bytes, never from the name or the browser
+const IMAGE_TYPES = [
+  { mime: 'image/jpeg', ext: 'jpg', test: b => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff },
+  { mime: 'image/png', ext: 'png', test: b => b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) },
+  { mime: 'image/webp', ext: 'webp', test: b => b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WEBP' },
+  { mime: 'image/avif', ext: 'avif', test: b => b.toString('ascii', 4, 8) === 'ftyp' && /^avi[fs]$/.test(b.toString('ascii', 8, 12)) },
+  { mime: 'image/gif', ext: 'gif', test: b => /^GIF8[79]a$/.test(b.toString('ascii', 0, 6)) }
+];
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024, files: 1, fields: 5 } });
+app.post('/api/admin/upload', upload.single('file'), wrap(async (req, res) => {
+  const buf = req.file?.buffer;
+  const type = buf && buf.length > 12 && IMAGE_TYPES.find(t => t.test(buf));
+  if (!type) throw fail(400, 'Povolené sú len obrázky JPG, PNG, WebP, AVIF alebo GIF');
+  const path = `${Date.now()}-${crypto.randomUUID()}.${type.ext}`;
+  const { error } = await db.storage.from('media').upload(path, buf, { contentType: type.mime, upsert: false });
   if (error) throw error;
   res.json({ url: db.storage.from('media').getPublicUrl(path).data.publicUrl });
 }));
 
-app.get('/api/admin/:res', adminOnly, resource, wrap(async (req, res) => {
+app.get('/api/admin/:res', resource, wrap(async (req, res) => {
   const { data, error } = await db.from(req.params.res).select('*').order(req.cfg.order, { ascending: !req.cfg.desc });
   if (error) throw error;
   res.json(data);
 }));
-app.post('/api/admin/:res', adminOnly, resource, wrap(async (req, res) => {
-  const { data, error } = await db.from(req.params.res).insert(pick(req.body, req.cfg.fields)).select().single();
+app.post('/api/admin/:res', resource, wrap(async (req, res) => {
+  const { data, error } = await db.from(req.params.res).insert(validate(req.body, req.cfg)).select().single();
   if (error) throw error;
   res.status(201).json(data);
 }));
-app.put('/api/admin/:res/:id', adminOnly, resource, wrap(async (req, res) => {
-  const { data, error } = await db.from(req.params.res).update(pick(req.body, req.cfg.fields)).eq('id', req.params.id).select().single();
+app.put('/api/admin/:res/:id', resource, idParam, wrap(async (req, res) => {
+  const { data, error } = await db.from(req.params.res).update(validate(req.body, req.cfg)).eq('id', req.params.id).select().single();
   if (error) throw error;
   res.json(data);
 }));
-app.delete('/api/admin/:res/:id', adminOnly, resource, wrap(async (req, res) => {
+app.delete('/api/admin/:res/:id', resource, idParam, wrap(async (req, res) => {
   const { error } = await db.from(req.params.res).delete().eq('id', req.params.id);
   if (error) throw error;
   res.status(204).end();
 }));
+
+/* ---------- Fallbacks: no stack traces, no framework error pages ---------- */
+app.use((req, res) => res.status(404).json({ error: 'Nenájdené' }));
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'Neplatná požiadavka' });
+  if (err.type === 'entity.too.large' || err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'Príliš veľká požiadavka' });
+  if (err instanceof multer.MulterError) return res.status(400).json({ error: 'Neplatný súbor' });
+  console.error(err);
+  res.status(500).json({ error: 'Nastala chyba servera' });
+});
 
 app.listen(PORT, () => console.log(`API beží na :${PORT}`));

@@ -37,12 +37,28 @@ services:
     buildCommand: ""
     staticPublishPath: .
     headers:
+      # Only our own scripts; network only to our API, Spotify embed and Supabase images
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co; font-src 'self'; connect-src 'self' https://fenomenal-api.onrender.com; frame-src https://open.spotify.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+      - path: /*
+        name: Strict-Transport-Security
+        value: max-age=63072000; includeSubDomains
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
       - path: /*
         name: X-Content-Type-Options
         value: nosniff
       - path: /*
         name: Referrer-Policy
         value: strict-origin-when-cross-origin
+      - path: /*
+        name: Permissions-Policy
+        value: camera=(), microphone=(), geolocation=(), usb=(), payment=()
+      - path: /*
+        name: Cross-Origin-Opener-Policy
+        value: same-origin
       - path: /img/*
         name: Cache-Control
         value: public, max-age=604800
@@ -58,5 +74,23 @@ services:
     staticPublishPath: .
     headers:
       - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co https://www.fenomenal.wtf https://fenomenal-web.onrender.com; connect-src 'self' https://fenomenal-api.onrender.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+      - path: /*
+        name: Strict-Transport-Security
+        value: max-age=63072000; includeSubDomains
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: no-referrer
+      - path: /*
+        name: Cache-Control
+        value: no-store
+      - path: /*
         name: X-Robots-Tag
-        value: noindex
+        value: noindex, nofollow
