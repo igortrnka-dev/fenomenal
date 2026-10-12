@@ -212,15 +212,16 @@ app.post('/api/order-request', limit('orderreq', 10, 10 * 60_000), noStore, wrap
   if (pErr) throw pErr;
   if (!product || !STRIPE_LINK.test(product.payment_link || '')) throw fail(400, 'Tento produkt sa momentálne nedá objednať');
 
-  const reference = 'FEN-' + crypto.randomBytes(6).toString('base64url').replace(/[-_]/g, 'X').toUpperCase().slice(0, 8);
+  // Stored through a validated, throttled DB function (works with the public key; the orders table stays private)
   const billing = { ...bill.a, company: company || undefined, email, phone };
-  const { error } = await db.from('orders').insert({
-    reference, status: 'pending_payment', email, name: bill.a.name, phone, billing,
-    shipping: ship ? ship.a : bill.a, note: note || null,
-    items: [{ product_id: product.id, name: product.sub ? `${product.name} — ${product.sub}` : product.name, price: Number(product.price) }],
-    currency: 'eur'
+  const { data: reference, error } = await authClient.rpc('create_order_request', {
+    p: { email, phone, billing, shipping: ship ? ship.a : bill.a, note, product_id: product.id }
   });
-  if (error) throw error;
+  if (error) {
+    if (/rate_limited/.test(error.message)) throw fail(429, 'Príliš veľa objednávok naraz, skús to prosím neskôr.');
+    if (/invalid/.test(error.message)) throw fail(400, 'Skontroluj prosím zadané údaje');
+    throw error;
+  }
 
   const url = new URL(product.payment_link);
   url.searchParams.set('client_reference_id', reference);
