@@ -1,6 +1,6 @@
 /**
  * Cookie consent (GDPR / ePrivacy).
- * Categories: "necessary" (always on: cart + this consent record, both in localStorage)
+ * Categories: "necessary" (always on: this consent record in localStorage)
  * and "media" (third-party embeds that set their own cookies — Spotify).
  * Nothing optional loads before the visitor decides. The choice is kept for 12 months.
  */
@@ -40,10 +40,10 @@ function build() {
   banner.setAttribute('aria-describedby', 'consentText');
   banner.innerHTML = `
     <h2 id="consentTitle">Nastavenia cookies</h2>
-    <p id="consentText">Nevyhnutné úložisko používame na fungovanie košíka. So súhlasom načítame aj prehrávač Spotify, ktorý si ukladá vlastné cookies. Viac v <a href="ochrana-osobnych-udajov.html#cookies">zásadách ochrany osobných údajov</a>.</p>
+    <p id="consentText">Nevyhnutné úložisko používame len na zapamätanie tvojej voľby. So súhlasom načítame aj prehrávač Spotify, ktorý si ukladá vlastné cookies. Viac v <a href="ochrana-osobnych-udajov.html#cookies">zásadách ochrany osobných údajov</a>.</p>
     <div class="consent-prefs" hidden>
       <label class="consent-opt">
-        <span><b>Nevyhnutné</b><small>Košík a uloženie tejto voľby. Bez nich web nefunguje.</small></span>
+        <span><b>Nevyhnutné</b><small>Uloženie tejto voľby. Bez neho by sa banner zobrazoval stále.</small></span>
         <input type="checkbox" checked disabled role="switch" aria-label="Nevyhnutné (vždy zapnuté)">
       </label>
       <label class="consent-opt">

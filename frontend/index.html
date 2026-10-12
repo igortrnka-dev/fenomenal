@@ -28,7 +28,6 @@
   <header class="nav" id="nav">
     <a href="#top" class="logo">FENOMENAL®</a>
     <div class="nav-actions">
-      <button class="nav-btn" id="cartOpen" aria-label="Otvoriť košík"><span class="cart-txt">Košík</span> <span id="cartCount">0</span></button>
       <button class="nav-btn menu-btn" id="menuOpen" aria-label="Menu" aria-expanded="false" aria-controls="menu">
         <span class="menu-txt">Menu</span><span class="dots" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
       </button>
@@ -209,16 +208,6 @@
     </div>
   </footer>
 
-  <aside class="drawer" id="drawer" aria-label="Košík" aria-hidden="true">
-    <div class="drawer-head"><h3>Košík</h3><button id="cartClose" aria-label="Zavrieť košík">Zavrieť ✕</button></div>
-    <ul id="cartItems"></ul>
-    <div class="drawer-foot">
-      <p>Spolu <strong id="cartTotal">0 €</strong></p>
-      <button class="fx-btn std" id="checkout">Objednať</button>
-    </div>
-  </aside>
-  <div class="overlay" id="overlay"></div>
-
   <!-- Celé bio člena (otvára „Čítať viac“ na karte crew) -->
   <dialog class="order bio" id="bio" aria-labelledby="bioTitle">
     <div class="order-card bio-card">
@@ -229,54 +218,6 @@
         <h3 id="bioTitle"></h3>
         <div id="bioIg"></div>
         <div class="bio-text" id="bioText"></div>
-      </div>
-    </div>
-  </dialog>
-
-  <!-- Doručovacie údaje po úspešnej platbe -->
-  <dialog class="order ship" id="ship" aria-labelledby="shipTitle">
-    <form class="order-card ship-card" id="shipForm" novalidate>
-      <div class="ship-head">
-        <p class="label"><i></i>Platba prebehla ✓</p>
-        <h3 id="shipTitle">Kam ti máme poslať CD?</h3>
-        <p class="order-sub" id="shipSub">Vyplň doručovacie údaje, nech vieme, kam zásielku poslať.</p>
-      </div>
-      <div class="ship-fields">
-        <label class="f-full">Meno a priezvisko<input name="name" autocomplete="name" required maxlength="120"></label>
-        <label class="f-full">Ulica a číslo domu<input name="street" autocomplete="street-address" required maxlength="200"></label>
-        <label>PSČ<input name="zip" autocomplete="postal-code" inputmode="numeric" required maxlength="12"></label>
-        <label class="f-wide">Mesto<input name="city" autocomplete="address-level2" required maxlength="100"></label>
-        <label>Krajina<select name="country" autocomplete="country" required><option value="SK">Slovensko</option><option value="CZ">Česko</option></select></label>
-        <label class="f-wide">Telefón<input name="phone" type="tel" autocomplete="tel" required maxlength="30" placeholder="+421 …"></label>
-        <label class="f-full">Poznámka pre kuriéra <small>(nepovinné)</small><textarea name="note" rows="2" maxlength="500"></textarea></label>
-      </div>
-      <p class="ship-error" id="shipError" role="alert"></p>
-      <div class="ship-actions">
-        <button class="fx-btn std ink" type="submit" id="shipSubmit">Potvrdiť adresu</button>
-        <button class="ship-later" type="button" id="shipLater">Vyplním neskôr</button>
-      </div>
-    </form>
-  </dialog>
-
-  <!-- Karta objednávky: výber počtu kusov -->
-  <dialog class="order" id="order" aria-labelledby="orderTitle">
-    <div class="order-card">
-      <button class="order-close" id="orderClose" type="button" aria-label="Zavrieť">Zavrieť ✕</button>
-      <div class="order-pic" id="orderPic"></div>
-      <div class="order-body">
-        <p class="label"><i></i>Objednávka</p>
-        <h3 id="orderTitle"></h3>
-        <p class="order-sub" id="orderSub"></p>
-        <div class="order-row">
-          <span>Počet kusov</span>
-          <div class="stepper">
-            <button type="button" data-step="-1" aria-label="Menej kusov">−</button>
-            <output id="orderQty" aria-live="polite">1</output>
-            <button type="button" data-step="1" aria-label="Viac kusov">+</button>
-          </div>
-        </div>
-        <div class="order-row order-total"><span>Spolu</span><strong id="orderTotal"></strong></div>
-        <button class="fx-btn std ink" id="orderAdd" type="button">Pridať do košíka</button>
       </div>
     </div>
   </dialog>

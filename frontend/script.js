@@ -186,7 +186,7 @@ $$('a', menu).forEach(a => a.addEventListener('click', () => setMenu(false)));
 let PLAYLISTS = [
   { title: 'FENOMENAL', sub: 'Album', type: 'album', id: '20yUeympd1xdHKamKavuJb' }
 ];
-// Only the album on CD for now. payment_link = Stripe Payment Link used when the API checkout is unreachable.
+// Only the album on CD for now. payment_link = Stripe Payment Link where the order is placed.
 let PRODUCTS = [
   { id: 101, name: 'FENOMENAL', sub: 'Album na CD', price: 15, img: 'img/cd.png', payment_link: 'https://buy.stripe.com/14AcN47dAcadb7p6kX2sM00' }
 ];
@@ -330,191 +330,40 @@ PLAYLISTS.forEach((p, i) => {
 });
 loadPlaylist(0);
 
-/* ---------- Shop & cart ---------- */
-// localStorage is user-controlled: keep only well-formed { id, qty } entries
-let cart = (() => {
-  try {
-    const raw = JSON.parse(localStorage.getItem('fen-cart') || '[]');
-    const clean = Array.isArray(raw) ? raw.filter(c => Number.isSafeInteger(c?.id) && Number.isInteger(c?.qty) && c.qty >= 1 && c.qty <= 10).map(c => ({ id: c.id, qty: c.qty })) : [];
-    if (JSON.stringify(clean) !== JSON.stringify(raw)) localStorage.setItem('fen-cart', JSON.stringify(clean));
-    return clean;
-  } catch { localStorage.removeItem('fen-cart'); return []; }
-})();
-// Never navigate to a URL we did not expect (no javascript:, no look-alike domains)
-const onlyOrigin = origin => u => { try { const x = new URL(u); return x.origin === origin && x.username === '' && x.password === ''; } catch { return false; } };
-const STRIPE_CHECKOUT = { test: onlyOrigin('https://checkout.stripe.com') };
-const STRIPE_LINK = { test: onlyOrigin('https://buy.stripe.com') };
-const fmt = n => n + ' €';
+/* ---------- Shop (Stripe Payment Link) ----------
+   "Objednať" goes straight to the product's Stripe Payment Link; Stripe asks for the quantity,
+   shipping address and payment. No cart, no secret key on our side. */
+['fen-cart', 'fen-pending-order'].forEach(k => { try { localStorage.removeItem(k); } catch { /* storage blocked */ } }); // leftovers of the old checkout
+// Only real Stripe payment links (no javascript:, no look-alike domains)
+const isStripeLink = u => { try { const x = new URL(u); return x.origin === 'https://buy.stripe.com' && !x.username && !x.password; } catch { return false; } };
+const fmt = n => `${String(n).replace('.', ',')} €`;
 const toast = (msg, ms = 2000) => {
   const t = $('#toast'); t.textContent = msg; t.classList.add('show');
   clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), ms);
 };
 $('#shopGrid').innerHTML = PRODUCTS.map(p => `
-  <article class="product" data-id="${p.id}" data-st-opacity="0,1" data-st-spring="1,0,500,60">
+  <article class="product" data-st-opacity="0,1" data-st-spring="1,0,500,60">
     <div class="product-pic">${img(p.img, `alt="${esc(p.name)} — ${esc(p.sub || '')}"`)}</div>
     <div class="product-info">
       <small>${esc(p.sub || '')}</small>
       <h3>${esc(p.name)}</h3>
       <p class="price">${fmt(p.price)}</p>
-      <button class="fx-btn std ink order-btn" type="button">Objednať</button>
+      ${isStripeLink(p.payment_link)
+        ? `<a class="fx-btn std ink" href="${esc(p.payment_link)}" rel="noopener">Objednať</a>`
+        : '<button class="fx-btn std ink" type="button" disabled>Čoskoro</button>'}
+      <p class="product-note">Počet kusov, doručovaciu adresu a platbu zadáš na zabezpečenej stránke Stripe.</p>
     </div>
   </article>`).join('');
 
-// "Objednať" opens the order card where the quantity is chosen
-const order = $('#order'), MAX_QTY = 10;
-let ordering = null, qty = 1;
-const syncOrder = () => {
-  $('#orderQty').textContent = qty;
-  $('#orderTotal').textContent = fmt(qty * ordering.price);
-  $('[data-step="-1"]', order).disabled = qty <= 1;
-  $('[data-step="1"]', order).disabled = qty >= MAX_QTY;
-};
-function openOrder(product) {
-  ordering = product; qty = 1;
-  $('#orderTitle').textContent = product.name;
-  $('#orderSub').textContent = `${product.sub || ''} • ${fmt(product.price)} / ks`;
-  $('#orderPic').innerHTML = img(product.img, 'alt=""');
-  syncOrder();
-  order.showModal();
-  appear($('.order-card', order), { y: 24, duration: 0.8 });
-}
-$('#shopGrid').addEventListener('click', e => {
-  if (!e.target.closest('.order-btn')) return;
-  openOrder(PRODUCTS.find(p => p.id === +e.target.closest('.product').dataset.id));
-});
-order.addEventListener('click', e => {
-  const step = e.target.closest('[data-step]');
-  if (step) { qty = Math.min(MAX_QTY, Math.max(1, qty + +step.dataset.step)); syncOrder(); }
-  if (e.target === order) order.close(); // click on the backdrop
-});
-$('#orderClose').onclick = () => order.close();
-$('#orderAdd').onclick = () => {
-  const found = cart.find(i => i.id === ordering.id);
-  found ? (found.qty = Math.min(MAX_QTY, found.qty + qty)) : cart.push({ id: ordering.id, qty });
-  saveCart();
-  order.close();
-  setDrawer(true);
-  toast(`Pridané do košíka: ${qty} ks ✓`);
-};
-
-function saveCart() {
-  localStorage.setItem('fen-cart', JSON.stringify(cart));
-  renderCart();
-}
-function renderCart() {
-  cart = cart.filter(c => PRODUCTS.some(x => x.id === c.id));
-  const ul = $('#cartItems');
-  ul.innerHTML = cart.length ? cart.map((c, i) => {
-    const p = PRODUCTS.find(x => x.id === c.id);
-    return `<li>${img(p.img, 'alt=""')}<div>${esc(p.name)}<br><small>${esc(p.sub || '')} • ${fmt(p.price)}</small></div>
-      <div class="qty"><button data-a="-" data-i="${i}" aria-label="Menej">−</button> ${c.qty} <button data-a="+" data-i="${i}" aria-label="Viac">+</button></div></li>`;
-  }).join('') : '<li class="empty">Košík je prázdny</li>';
-  $('#cartCount').textContent = cart.reduce((s, c) => s + c.qty, 0);
-  $('#cartTotal').textContent = fmt(cart.reduce((s, c) => s + c.qty * PRODUCTS.find(x => x.id === c.id).price, 0));
-}
-$('#cartItems').addEventListener('click', e => {
-  const b = e.target.closest('button'); if (!b) return;
-  const i = +b.dataset.i;
-  b.dataset.a === '+' ? (cart[i].qty = Math.min(MAX_QTY, cart[i].qty + 1)) : --cart[i].qty <= 0 && cart.splice(i, 1);
-  saveCart();
-});
-const setDrawer = open => {
-  $('#drawer').classList.toggle('open', open);
-  $('#drawer').setAttribute('aria-hidden', !open);
-  $('#overlay').classList.toggle('on', open);
-};
-$('#cartOpen').onclick = () => setDrawer(true);
-$('#cartClose').onclick = $('#overlay').onclick = () => setDrawer(false);
-// Stripe Checkout: the backend creates the session from DB prices (exact quantities, shipping address).
-// If the API is unreachable, fall back to the product's Stripe Payment Link.
-$('#checkout').onclick = async () => {
-  if (!cart.length) return toast('Košík je prázdny');
-  const btn = $('#checkout');
-  btn.disabled = true;
-  toast('Presmerovávam na platbu…', 8000);
-  try {
-    const r = await fetch(`${API}/api/checkout`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items: cart.map(c => ({ id: c.id, qty: c.qty })) }),
-      signal: AbortSignal.timeout(20000)
-    });
-    const d = await r.json().catch(() => ({}));
-    if (r.ok && STRIPE_CHECKOUT.test(d.url || '')) { location.href = d.url; return; }
-    if (r.status >= 400 && r.status < 500) throw Object.assign(new Error(d.error || 'Objednávku sa nepodarilo spracovať'), { user: true });
-    throw new Error(d.error || 'API nedostupné');
-  } catch (e) {
-    const link = PRODUCTS.find(p => cart.some(c => c.id === p.id) && STRIPE_LINK.test(p.payment_link || ''))?.payment_link;
-    if (!e.user && link) { location.href = link; return; }
-    toast(e.user ? e.message : 'Platbu sa teraz nepodarilo spustiť, skús to o chvíľu.', 4000);
-    btn.disabled = false;
-  }
-};
-// Back from Stripe. A paid order still needs a shipping address: the form opens now and on every
-// next visit until it is confirmed (the session id waits in localStorage).
-const PENDING = 'fen-pending-order';
-const ship = $('#ship'), shipForm = $('#shipForm');
-const shipErr = msg => { $('#shipError').textContent = msg || ''; };
-async function openShipping(sessionId) {
-  let info = null;
-  try {
-    const r = await fetch(`${API}/api/order/${encodeURIComponent(sessionId)}`, { signal: AbortSignal.timeout(30000) });
-    info = await r.json().catch(() => ({}));
-    if (r.status === 400 || r.status === 404) { localStorage.removeItem(PENDING); return toast('Objednávku sa nepodarilo overiť. Napíš nám prosím.', 6000); }
-    if (!r.ok) throw new Error(info.error);
-  } catch { info = null; } // API asleep/unreachable: show the form anyway, submit will retry
-  if (info?.confirmed) { localStorage.removeItem(PENDING); return toast('Ďakujeme! Adresu už máme, CD čoskoro posielame.', 5000); }
-  shipForm.reset();
-  shipErr();
-  const sh = info?.shipping || {};
-  for (const k of ['name', 'street', 'zip', 'city', 'phone']) if (sh[k]) shipForm.elements[k].value = sh[k];
-  if (sh.country) shipForm.elements.country.value = sh.country;
-  $('#shipSub').textContent = info?.email
-    ? `Platba ${String(info.amount).replace('.', ',')} € prebehla. Potvrdenie sme poslali na ${info.email}. Vyplň, kam ti máme CD poslať.`
-    : 'Vyplň doručovacie údaje, nech vieme, kam zásielku poslať.';
-  ship.dataset.session = sessionId;
-  if (!ship.open) { ship.showModal(); appear($('.ship-card', ship), { y: 24, duration: 0.8 }); }
-}
-shipForm.addEventListener('submit', async e => {
-  e.preventDefault();
-  shipForm.querySelectorAll('.invalid').forEach(el => el.classList.remove('invalid'));
-  const data = Object.fromEntries(new FormData(shipForm));
-  const empty = ['name', 'street', 'zip', 'city', 'phone'].filter(k => !data[k].trim());
-  if (empty.length) { empty.forEach(k => shipForm.elements[k].classList.add('invalid')); return shipErr('Vyplň prosím všetky povinné údaje.'); }
-  const btn = $('#shipSubmit'); btn.disabled = true; shipErr();
-  try {
-    const r = await fetch(`${API}/api/order/${encodeURIComponent(ship.dataset.session)}/shipping`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), signal: AbortSignal.timeout(30000)
-    });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) {
-      (d.missing || []).forEach(k => shipForm.elements[k]?.classList.add('invalid'));
-      throw new Error(r.status < 500 && d.error ? d.error : 'Adresu sa nepodarilo uložiť. Skús to prosím o chvíľu znova.');
-    }
-    localStorage.removeItem(PENDING);
-    ship.close();
-    toast('Ďakujeme! Adresu máme, CD čoskoro posielame.', 6000);
-  } catch (err) {
-    shipErr(err.name === 'TimeoutError' || err instanceof TypeError ? 'Server sa práve prebúdza, skús to o chvíľu znova.' : err.message);
-  } finally { btn.disabled = false; }
-});
-$('#shipLater').onclick = () => { ship.close(); toast('Adresu ti pripomenieme pri ďalšej návšteve.', 4000); };
-ship.addEventListener('cancel', e => e.preventDefault()); // Esc must not silently drop the form
+// Back from Stripe (Payment Link → "After payment" redirect to /?order=success)
 {
   const q = new URLSearchParams(location.search);
-  if (q.get('order') === 'success') {
-    cart = []; saveCart();
-    if (q.get('session_id')) localStorage.setItem(PENDING, q.get('session_id'));
-  }
-  if (q.get('order') === 'cancel') toast('Platba bola zrušená, košík ti ostal.', 4000);
-  if (q.has('order')) history.replaceState(null, '', location.pathname + location.hash);
-  const pending = localStorage.getItem(PENDING);
-  if (pending) setTimeout(() => openShipping(pending), q.get('order') === 'success' ? 600 : 4200);
+  if (q.get('order') === 'success') toast('Ďakujeme za objednávku! Potvrdenie ti príde e-mailom a CD čoskoro posielame.', 7000);
+  if (q.has('order') || q.has('session_id')) history.replaceState(null, '', location.pathname + location.hash);
 }
-renderCart();
 
 addEventListener('keydown', e => {
-  if (e.key === 'Escape') { setDrawer(false); setMenu(false); }
+  if (e.key === 'Escape') setMenu(false);
 });
 
 // Crosshair cursor (React Bits) — only for real mouse pointers; difference blend keeps it visible on light and dark sections
