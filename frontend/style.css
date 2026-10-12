@@ -146,6 +146,7 @@ h2{font-size:clamp(32px,3.35vw,48px);font-weight:600;line-height:1;text-transfor
   -webkit-mask-image:radial-gradient(circle var(--fr) at var(--fx) var(--fy),#000 0%,#000 45%,transparent 100%);
   mask-image:radial-gradient(circle var(--fr) at var(--fx) var(--fy),#000 0%,#000 45%,transparent 100%)}
 @media (hover:none){.hero-focus{display:none}}
+.hero-video{display:none}
 /* glitch flashes: one full layer + three displaced slices, driven by WAAPI in script.js */
 .hero-glitch{position:absolute;inset:0;overflow:hidden;pointer-events:none}
 .hero-glitch>div{position:absolute;inset:0;opacity:0}
@@ -368,6 +369,8 @@ dialog.checkout{width:min(680px,calc(100vw - 24px))}
   .hero-bottom{flex-direction:column;align-items:flex-start}
   .hero-inner{padding-bottom:40px}
   .hero-sub{font-size:16px}
+  .hero-video{display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .hero-glitch{display:none}
   .player-list{margin:0 0 32px}
   .member-inner{padding:110px var(--in) 48px}
   .shop{padding-bottom:96px}

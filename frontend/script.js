@@ -56,6 +56,18 @@ appear($('#heroBg'), { y: 24, duration: 6, from: 1 });
 $$('.hero .plus.rot').forEach(p => appear(p, { delay: 2.6, y: 0, rotate: -90, from: 1 }));
 initParallax([{ el: $('#heroBg'), speed: 0.8 }]);
 
+// Mobile: looping video background (loaded only when the mobile layout is active)
+{
+  const video = $('#heroVideo'), mq = matchMedia('(max-width: 809.98px)');
+  const sync = () => {
+    if (!mq.matches) { video.pause(); return; }
+    if (!video.src) { video.src = video.dataset.src; video.preload = 'auto'; }
+    if (!reduced) video.play().catch(() => {});
+  };
+  mq.addEventListener('change', sync);
+  sync();
+}
+
 // Glitch flashes: other photos break through the main one in sliced, jittering bursts
 if (!reduced) {
   const box = $('#heroGlitch'), hero = $('#hero');

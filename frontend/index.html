@@ -67,6 +67,8 @@
         <img class="hero-blur" src="img/hero-blur.jpg" width="1200" height="1200" alt="Fenomenal crew s logom" fetchpriority="high" decoding="async">
         <!-- ostrá vrstva, odkrytá maskou okolo kurzora -->
         <div class="hero-focus" id="heroFocus" aria-hidden="true"><picture><source type="image/avif" srcset="img/hero-1200.avif 1200w, img/hero.avif 2400w" sizes="100vw"><img src="img/hero.jpg" srcset="img/hero-1200.jpg 1200w, img/hero.jpg 2400w" sizes="100vw" width="2400" height="2400" alt="" loading="lazy" decoding="async"></picture></div>
+        <!-- video pozadie len na mobile (src dopĺňa script.js, aby sa na desktope nesťahovalo) -->
+        <video class="hero-video" id="heroVideo" data-src="img/hero-mobile.mp4" poster="img/hero-mobile-poster.jpg" muted loop playsinline preload="none" aria-hidden="true"></video>
         <!-- glitch prebliknutia ďalších fotiek (vrstvy dopĺňa script.js) -->
         <div class="hero-glitch" id="heroGlitch" aria-hidden="true"></div>
       </div>
