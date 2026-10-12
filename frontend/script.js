@@ -63,7 +63,7 @@ initParallax([{ el: $('#heroBg'), speed: 0.8 }]);
   const play = () => { if (mq.matches && !document.hidden && video.paused) video.play().catch(() => {}); };
   const sync = () => {
     if (!mq.matches) { video.pause(); return; }
-    if (!video.src) { video.src = video.dataset.src; video.preload = 'auto'; video.load(); }
+    if (!video.src) { video.src = video.canPlayType('video/mp4; codecs="hvc1"') ? video.dataset.srcHevc : video.dataset.src; /* HEVC: plné 1080p pri menšej veľkosti */ video.preload = 'auto'; video.load(); }
     play();
   };
   mq.addEventListener('change', sync);
