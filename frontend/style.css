@@ -332,6 +332,19 @@ dialog.order::backdrop{background:rgba(10,10,10,.55)}
 .toast.show{translate:-50% 0;visibility:visible}
 
 /* ---------- responsive (Reelio breakpoints 1200 / 810) ---------- */
+/* member bio: faded preview on the card + full text in a dialog */
+.member-bio{margin-top:20px;max-width:330px;max-height:9.6em;overflow:hidden;font-size:14px;font-weight:400;line-height:1.6;color:var(--light-2);-webkit-mask-image:linear-gradient(#000 45%,transparent);mask-image:linear-gradient(#000 45%,transparent)}
+.member-bio p+p{margin-top:.8em}
+.member-more{margin-top:10px;font-size:14px;font-weight:500;color:var(--white);text-decoration:underline;text-underline-offset:3px}
+.member-more:hover{color:var(--light-2)}
+.bio-card{align-items:start;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr)}
+.bio-pic{aspect-ratio:448/608;border-radius:12px;overflow:hidden;position:sticky;top:0}
+.bio-pic img{width:100%;height:100%;object-fit:cover}
+.bio-body{display:flex;flex-direction:column;gap:16px;padding-top:28px}
+.bio-body h3{font-size:40px;font-weight:600;line-height:1;text-transform:uppercase}
+.bio-text p{font-size:16px;font-weight:400;line-height:1.6;color:#333}
+.bio-text p+p{margin-top:12px}
+
 /* very wide screens: keep content inside the 1920px grid */
 @media (min-width:1921px){
   :root{--in:calc((100vw - 1920px) / 2 + 96px)}
@@ -365,6 +378,11 @@ dialog.order::backdrop{background:rgba(10,10,10,.55)}
   .order-card{grid-template-columns:1fr;gap:16px;padding:24px 20px}
   .order-pic{max-width:240px;margin:24px auto 0}
   .order-body h3{font-size:32px}
+  .member-bio{max-height:4.8em;margin-top:14px}
+  .bio-card{grid-template-columns:1fr}
+  .bio-pic{max-width:200px;position:static}
+  .bio-body{padding-top:0}
+  .bio-body h3{font-size:32px}
   .hero-title{font-size:min(9.4vw,48px)}
   .logo{font-size:16px}
   .menu-inner{padding:110px var(--in) 32px}

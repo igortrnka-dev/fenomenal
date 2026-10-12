@@ -141,7 +141,7 @@
           <div class="member-bg"><img src="img/komarko-blur.jpg" width="480" height="480" alt="" loading="lazy" decoding="async" data-st-scale="1.4,1" data-st-spring=".3,0,200,60"></div>
           <div class="grid-lines four"><i></i><i></i><i></i><i></i><i></i></div>
           <div class="member-inner">
-            <div class="member-text"><small>Člen 01</small><h3>Komarko</h3></div>
+            <div class="member-text"><small>Člen 01</small><h3>Komarko</h3><div class="member-bio"><p>Komarko sa narodil v Bratislave a do svojich dvadsiatich rokov vyrastal v Petržalke. Jeho cesta k hudbe sa začala približne v roku 2019, keď trávil čas s kamarátmi, ktorí tvorili hudbu. Chodil s nimi do štúdia, kde postupne spoznával svet hudobnej tvorby. Ich cesty sa však neskôr rozišli, no jeho príbeh s hudbou sa tým neskončil.</p><p>V roku 2024 si ho hudba našla vlastným spôsobom. Komarko začal písať texty, tvoriť vlastné tracky a naplno pracovať na svojom sne. Doma si vybudoval vlastné štúdio a postupne začal vydávať hudbu na digitálnych platformách.</p><p>Začiatkom roka 2026 posunul svoju tvorbu na ďalšiu úroveň vybudovaním vlastného profesionálneho štúdia, kde dnes intenzívne pracuje na nových projektoch.</p></div><button type="button" class="member-more">Čítať viac</button></div>
             <div class="member-pic"><picture><source type="image/avif" srcset="img/komarko.avif"><img src="img/komarko.jpg" alt="Komarko" loading="lazy" decoding="async" data-st-scale="1.2,1" data-st-spring=".3,0,200,60"></picture></div>
             <div class="member-side"><span>Bratislava</span><b>01</b></div>
           </div>
@@ -219,6 +219,19 @@
     </div>
   </aside>
   <div class="overlay" id="overlay"></div>
+
+  <!-- Celé bio člena (otvára „Čítať viac“ na karte crew) -->
+  <dialog class="order bio" id="bio" aria-labelledby="bioTitle">
+    <div class="order-card bio-card">
+      <button class="order-close" id="bioClose" type="button" aria-label="Zavrieť">Zavrieť ✕</button>
+      <div class="bio-pic" id="bioPic"></div>
+      <div class="bio-body">
+        <p class="label"><i></i><span id="bioRole"></span></p>
+        <h3 id="bioTitle"></h3>
+        <div class="bio-text" id="bioText"></div>
+      </div>
+    </div>
+  </dialog>
 
   <!-- Karta objednávky: výber počtu kusov -->
   <dialog class="order" id="order" aria-labelledby="orderTitle">

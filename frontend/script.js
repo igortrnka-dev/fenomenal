@@ -218,18 +218,38 @@ const blurBg = src => /^img\/(komarko|mash1k|badman)\.jpg$/.test(src)
   : `<img class="live-blur" src="${esc(src)}" alt="" loading="lazy" decoding="async" data-st-scale="1.4,1" data-st-spring=".3,0,200,60">`;
 
 /* ---------- Crew ---------- */
+// Bio: the card shows a faded preview, "Čítať viac" opens the full text with the photo
+const bioBlock = text => `<div class="member-bio">${text.trim().split(/\n\s*\n/).map(p => `<p>${esc(p.trim())}</p>`).join('')}</div>`
+  + '<button type="button" class="member-more">Čítať viac</button>';
 if (MEMBERS.length) { // members from the DB replace the static cards
   $('#crewGrid').innerHTML = MEMBERS.map((m, i) => `
   <article class="member" data-theme="dark">
     <div class="member-bg">${blurBg(m.img)}</div>
     <div class="grid-lines four"><i></i><i></i><i></i><i></i><i></i></div>
     <div class="member-inner">
-      <div class="member-text"><small>Člen ${num(i)}</small><h3>${esc(m.name)}</h3></div>
+      <div class="member-text"><small>Člen ${num(i)}</small><h3>${esc(m.name)}</h3>${m.bio ? bioBlock(m.bio) : ''}</div>
       <div class="member-pic">${img(m.img, `alt="${esc(m.name)}" data-st-scale="1.2,1" data-st-spring=".3,0,200,60"`)}</div>
       <div class="member-side"><span>Fenomenal</span><b>${num(i)}</b></div>
     </div>
   </article>`).join('');
 }
+
+const bioDlg = $('#bio');
+$('#crewGrid').addEventListener('click', e => {
+  const card = e.target.closest('.member-more')?.closest('.member');
+  if (!card) return;
+  $('#bioRole').textContent = $('.member-text small', card).textContent;
+  $('#bioTitle').textContent = $('.member-text h3', card).textContent;
+  $('#bioText').innerHTML = $('.member-bio', card).innerHTML;
+  const pic = $('.member-pic', card).cloneNode(true);
+  pic.querySelectorAll('[data-st-scale]').forEach(el => { el.removeAttribute('data-st-scale'); el.style.transform = ''; });
+  $('#bioPic').replaceChildren(...pic.childNodes);
+  bioDlg.showModal();
+  bioDlg.scrollTop = 0;
+  appear($('.bio-card', bioDlg), { y: 24, duration: 0.8 });
+});
+$('#bioClose').onclick = () => bioDlg.close();
+bioDlg.addEventListener('click', e => { if (e.target === bioDlg) bioDlg.close(); });
 
 /* ---------- Spotify player ----------
    The real embed (~850 KB from 8 domains) loads automatically once the music section gets close,
