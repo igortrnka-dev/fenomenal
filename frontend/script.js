@@ -330,9 +330,9 @@ PLAYLISTS.forEach((p, i) => {
 });
 loadPlaylist(0);
 
-/* ---------- Shop (Stripe Payment Link) ----------
-   "Objednať" goes straight to the product's Stripe Payment Link; Stripe asks for the quantity,
-   shipping address and payment. No cart, no secret key on our side. */
+/* ---------- Shop ----------
+   "Objednať" opens our billing/shipping form first. The backend stores the order and returns the
+   product's Stripe Payment Link with our order number (client_reference_id) and the e-mail prefilled. */
 ['fen-cart', 'fen-pending-order'].forEach(k => { try { localStorage.removeItem(k); } catch { /* storage blocked */ } }); // leftovers of the old checkout
 // Only real Stripe payment links (no javascript:, no look-alike domains)
 const isStripeLink = u => { try { const x = new URL(u); return x.origin === 'https://buy.stripe.com' && !x.username && !x.password; } catch { return false; } };
@@ -342,23 +342,75 @@ const toast = (msg, ms = 2000) => {
   clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), ms);
 };
 $('#shopGrid').innerHTML = PRODUCTS.map(p => `
-  <article class="product" data-st-opacity="0,1" data-st-spring="1,0,500,60">
+  <article class="product" data-id="${Number(p.id)}" data-st-opacity="0,1" data-st-spring="1,0,500,60">
     <div class="product-pic">${img(p.img, `alt="${esc(p.name)} — ${esc(p.sub || '')}"`)}</div>
     <div class="product-info">
       <small>${esc(p.sub || '')}</small>
       <h3>${esc(p.name)}</h3>
       <p class="price">${fmt(p.price)}</p>
       ${isStripeLink(p.payment_link)
-        ? `<a class="fx-btn std ink" href="${esc(p.payment_link)}" rel="noopener">Objednať</a>`
+        ? '<button class="fx-btn std ink order-btn" type="button">Objednať</button>'
         : '<button class="fx-btn std ink" type="button" disabled>Čoskoro</button>'}
-      <p class="product-note">Počet kusov, doručovaciu adresu a platbu zadáš na zabezpečenej stránke Stripe.</p>
+      <p class="product-note">Najprv vyplníš fakturačné údaje, potom zaplatíš na zabezpečenej stránke Stripe.</p>
     </div>
   </article>`).join('');
+
+const coDlg = $('#checkoutDlg'), coForm = $('#coForm');
+const coErr = msg => { $('#coError').textContent = msg || ''; };
+let coProduct = null;
+$('#shopGrid').addEventListener('click', e => {
+  if (!e.target.closest('.order-btn')) return;
+  coProduct = PRODUCTS.find(p => String(p.id) === e.target.closest('.product').dataset.id);
+  if (!coProduct) return;
+  $('#coProduct').textContent = `${coProduct.name}${coProduct.sub ? ' — ' + coProduct.sub : ''}, ${fmt(coProduct.price)}/ks`;
+  coErr();
+  coForm.querySelectorAll('.invalid').forEach(el => el.classList.remove('invalid'));
+  coDlg.showModal();
+  coDlg.scrollTop = 0;
+  appear($('.co-card', coDlg), { y: 24, duration: 0.8 });
+});
+coForm.elements.ship_different.addEventListener('change', e => { $('#coShip').hidden = !e.target.checked; });
+$('#coClose').onclick = () => coDlg.close();
+coDlg.addEventListener('click', e => { if (e.target === coDlg) coDlg.close(); });
+coForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  coForm.querySelectorAll('.invalid').forEach(el => el.classList.remove('invalid'));
+  const f = coForm.elements, data = {};
+  for (const el of f) if (el.name) data[el.name] = el.type === 'checkbox' ? el.checked : el.value;
+  if (!data.ship_different) for (const k of Object.keys(data)) if (k.startsWith('ship_') && k !== 'ship_different') delete data[k];
+  data.product_id = coProduct.id;
+  // quick client-side check (the server validates again)
+  const req = ['name', 'email', 'phone', 'street', 'zip', 'city', ...(data.ship_different ? ['ship_name', 'ship_street', 'ship_zip', 'ship_city'] : [])];
+  const empty = req.filter(k => !String(data[k] || '').trim());
+  if (!data.terms) empty.push('terms');
+  if (empty.length) { empty.forEach(k => f[k]?.classList.add('invalid')); f[empty[0]]?.focus(); return coErr('Vyplň prosím zvýraznené údaje.'); }
+  const btn = $('#coSubmit'); btn.disabled = true; coErr('Ukladám objednávku…');
+  try {
+    const r = await fetch(`${API}/api/order-request`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), signal: AbortSignal.timeout(45000)
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      (d.missing || []).forEach(k => f[k]?.classList.add('invalid'));
+      throw new Error(r.status < 500 && d.error ? d.error : 'Objednávku sa nepodarilo uložiť. Skús to prosím o chvíľu znova.');
+    }
+    if (!isStripeLink(d.url)) throw new Error('Platbu sa nepodarilo spustiť.');
+    try { sessionStorage.setItem('fen-last-order', d.reference); } catch { /* ignore */ }
+    coErr(`Objednávka ${d.reference} uložená, presmerovávam na platbu…`);
+    location.href = d.url;
+  } catch (err) {
+    btn.disabled = false;
+    coErr(err.name === 'TimeoutError' || err instanceof TypeError ? 'Server sa práve prebúdza, skús to prosím o chvíľu znova.' : err.message);
+  }
+});
 
 // Back from Stripe (Payment Link → "After payment" redirect to /?order=success)
 {
   const q = new URLSearchParams(location.search);
-  if (q.get('order') === 'success') toast('Ďakujeme za objednávku! Potvrdenie ti príde e-mailom a CD čoskoro posielame.', 7000);
+  if (q.get('order') === 'success') {
+    let ref = ''; try { ref = sessionStorage.getItem('fen-last-order') || ''; sessionStorage.removeItem('fen-last-order'); } catch { /* ignore */ }
+    toast(`Ďakujeme za objednávku${ref ? ' ' + ref : ''}! Potvrdenie ti príde e-mailom a CD čoskoro posielame.`, 8000);
+  }
   if (q.has('order') || q.has('session_id')) history.replaceState(null, '', location.pathname + location.hash);
 }
 

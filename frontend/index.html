@@ -208,6 +208,41 @@
     </div>
   </footer>
 
+  <!-- Objednávka: fakturačné a doručovacie údaje pred platbou (potom Stripe) -->
+  <dialog class="order checkout" id="checkoutDlg" aria-labelledby="coTitle">
+    <form class="order-card co-card" id="coForm" novalidate>
+      <button class="order-close" id="coClose" type="button" aria-label="Zavrieť">Zavrieť ✕</button>
+      <div class="co-head">
+        <p class="label"><i></i>Objednávka • <span id="coProduct"></span></p>
+        <h3 id="coTitle">Fakturačné údaje</h3>
+        <p class="co-sub">Vyplň, kam ti máme CD poslať. Počet kusov a platbu zadáš v ďalšom kroku na zabezpečenej stránke Stripe.</p>
+      </div>
+      <div class="co-fields">
+        <label class="f-full">Meno a priezvisko<input name="name" autocomplete="name" required maxlength="120"></label>
+        <label>E-mail<input name="email" type="email" autocomplete="email" required maxlength="254"></label>
+        <label>Telefón<input name="phone" type="tel" autocomplete="tel" required maxlength="30" placeholder="+421 …"></label>
+        <label class="f-full">Ulica a číslo domu<input name="street" autocomplete="street-address" required maxlength="200"></label>
+        <label class="f-zip">PSČ<input name="zip" autocomplete="postal-code" inputmode="numeric" required maxlength="12"></label>
+        <label class="f-city">Mesto<input name="city" autocomplete="address-level2" required maxlength="100"></label>
+        <label>Krajina<select name="country" autocomplete="country" required><option value="SK">Slovensko</option><option value="CZ">Česko</option></select></label>
+        <label>Firma <small>(nepovinné)</small><input name="company" autocomplete="organization" maxlength="120"></label>
+        <label class="f-full f-check"><input type="checkbox" name="ship_different"> Doručiť na inú adresu</label>
+        <fieldset class="f-full co-ship" id="coShip" hidden>
+          <legend>Doručovacia adresa</legend>
+          <label class="f-full">Meno príjemcu<input name="ship_name" autocomplete="shipping name" maxlength="120"></label>
+          <label class="f-full">Ulica a číslo domu<input name="ship_street" autocomplete="shipping street-address" maxlength="200"></label>
+          <label class="f-zip">PSČ<input name="ship_zip" autocomplete="shipping postal-code" inputmode="numeric" maxlength="12"></label>
+          <label class="f-city">Mesto<input name="ship_city" autocomplete="shipping address-level2" maxlength="100"></label>
+          <label class="f-full">Krajina<select name="ship_country" autocomplete="shipping country"><option value="SK">Slovensko</option><option value="CZ">Česko</option></select></label>
+        </fieldset>
+        <label class="f-full">Poznámka <small>(nepovinné)</small><textarea name="note" rows="2" maxlength="500"></textarea></label>
+        <label class="f-full f-check"><input type="checkbox" name="terms" required> Oboznámil(a) som sa so <a href="ochrana-osobnych-udajov.html" target="_blank" rel="noopener">zásadami ochrany osobných údajov</a></label>
+      </div>
+      <p class="co-error" id="coError" role="alert"></p>
+      <button class="fx-btn std ink co-submit" type="submit" id="coSubmit">Pokračovať na platbu</button>
+    </form>
+  </dialog>
+
   <!-- Celé bio člena (otvára „Čítať viac“ na karte crew) -->
   <dialog class="order bio" id="bio" aria-labelledby="bioTitle">
     <div class="order-card bio-card">

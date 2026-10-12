@@ -161,7 +161,15 @@ const resource = (req, res, next) => {
 const idParam = (req, res, next) => /^\d{1,12}$/.test(req.params.id) ? next() : res.status(400).json({ error: 'Neplatné ID' });
 
 /* ---------- Health ---------- */
-app.get('/health', (_, res) => res.json({ ok: true }));
+// db = whether the backend can write orders (service_role key valid); cached for a minute
+let dbCheck = { at: 0, ok: false };
+app.get('/health', async (_, res) => {
+  if (Date.now() - dbCheck.at > 60_000) {
+    const { error } = await db.from('orders').select('id', { head: true, count: 'exact' }).limit(1);
+    dbCheck = { at: Date.now(), ok: !error };
+  }
+  res.json({ ok: true, db: dbCheck.ok });
+});
 
 /* ---------- Public ---------- */
 // Read with the anon key: RLS only exposes published rows, so public pages never need the service_role key
@@ -170,6 +178,55 @@ app.get('/api/:res', limit('public', 300, 60_000), resource, wrap(async (req, re
     .eq('published', true).order(req.cfg.order, { ascending: !req.cfg.desc });
   if (error) throw error;
   res.set('Cache-Control', 'public, max-age=30').json(data);
+}));
+
+/* ---------- Order request before payment (Stripe Payment Link) ---------- */
+// The customer fills billing/shipping details on our site first; we store them with an order number
+// and send the customer to the product's Payment Link with that number as client_reference_id.
+const EMAIL = /^[^\s@<>()[\]\\,;:"]{1,64}@[A-Za-z0-9.-]{1,190}\.[A-Za-z]{2,24}$/;
+const clean = (v, max) => (isStr(v) ? v : '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+function address(src, prefix = '') {
+  const a = {
+    name: clean(src[prefix + 'name'], 120), street: clean(src[prefix + 'street'], 200), city: clean(src[prefix + 'city'], 100),
+    zip: clean(src[prefix + 'zip'], 12), country: ['SK', 'CZ'].includes(src[prefix + 'country']) ? src[prefix + 'country'] : ''
+  };
+  const missing = ['name', 'street', 'city', 'zip', 'country'].filter(k => !a[k]).map(k => prefix + k);
+  if (a.zip && !/^[0-9 ]{4,8}$/.test(a.zip)) missing.push(prefix + 'zip');
+  return { a, missing };
+}
+app.post('/api/order-request', limit('orderreq', 10, 10 * 60_000), noStore, wrap(async (req, res) => {
+  const b = req.body && typeof req.body === 'object' ? req.body : {};
+  const bill = address(b);
+  const email = clean(b.email, 254).toLowerCase(), phone = clean(b.phone, 30), company = clean(b.company, 120), note = clean(b.note, 500);
+  const missing = [...bill.missing];
+  if (!EMAIL.test(email)) missing.push('email');
+  if (!/^\+?[0-9 ()/-]{6,20}$/.test(phone)) missing.push('phone');
+  const ship = b.ship_different === true ? address(b, 'ship_') : null;
+  if (ship) missing.push(...ship.missing);
+  if (b.terms !== true) missing.push('terms');
+  if (missing.length) throw fail(400, 'Skontroluj prosím zvýraznené údaje', { fields: [...new Set(missing)] });
+
+  const productId = Number(b.product_id);
+  if (!Number.isSafeInteger(productId) || productId < 1) throw fail(400, 'Neplatný produkt');
+  const { data: product, error: pErr } = await authClient.from('products').select('id, name, sub, price, payment_link').eq('id', productId).maybeSingle();
+  if (pErr) throw pErr;
+  if (!product || !STRIPE_LINK.test(product.payment_link || '')) throw fail(400, 'Tento produkt sa momentálne nedá objednať');
+
+  const reference = 'FEN-' + crypto.randomBytes(6).toString('base64url').replace(/[-_]/g, 'X').toUpperCase().slice(0, 8);
+  const billing = { ...bill.a, company: company || undefined, email, phone };
+  const { error } = await db.from('orders').insert({
+    reference, status: 'pending_payment', email, name: bill.a.name, phone, billing,
+    shipping: ship ? ship.a : bill.a, note: note || null,
+    items: [{ product_id: product.id, name: product.sub ? `${product.name} — ${product.sub}` : product.name, price: Number(product.price) }],
+    currency: 'eur'
+  });
+  if (error) throw error;
+
+  const url = new URL(product.payment_link);
+  url.searchParams.set('client_reference_id', reference);
+  url.searchParams.set('prefilled_email', email);
+  url.searchParams.set('locale', 'sk');
+  res.json({ reference, url: url.href });
 }));
 
 /* ---------- Checkout (Stripe) ---------- */

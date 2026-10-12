@@ -318,6 +318,30 @@ dialog.order::backdrop{background:rgba(10,10,10,.55)}
 .bio .member-ig:hover{background:var(--ink);color:var(--white);border-color:var(--ink)}
 #bioIg:empty{display:none}
 
+/* checkout form (billing/shipping before Stripe) */
+dialog.checkout{width:min(680px,calc(100vw - 24px))}
+.co-card{display:block}
+.co-head{display:flex;flex-direction:column;gap:12px;margin-bottom:24px;padding-right:80px}
+.co-head h3{font-size:clamp(28px,3vw,40px);font-weight:600;line-height:1;text-transform:uppercase}
+.co-sub{font-size:14px;font-weight:400;line-height:1.4;color:var(--gray-2)}
+.co-fields{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px}
+.co-fields .f-full{grid-column:1/-1}
+.co-fields label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:500;color:var(--gray-2)}
+.co-fields small{font-weight:400;color:var(--gray)}
+.co-fields :is(input:not([type=checkbox]),select,textarea){width:100%;height:44px;padding:0 14px;border:1px solid var(--line-l);border-radius:8px;background:var(--white);font:inherit;font-size:16px;font-weight:400;color:var(--ink);transition:border-color .2s}
+.co-fields textarea{height:auto;padding:10px 14px;resize:vertical}
+.co-fields :is(input,select,textarea):focus{outline:none;border-color:var(--ink)}
+.co-fields .f-check{flex-direction:row;align-items:center;gap:10px;font-size:14px;color:var(--ink)}
+.co-fields .f-check input{width:18px;height:18px;accent-color:var(--ink);flex:none}
+.co-fields .f-check a{text-decoration:underline;text-underline-offset:2px}
+.co-fields .invalid{border-color:#c0392b!important;background:#fff6f5}
+.co-fields .f-check .invalid{outline:2px solid #c0392b;outline-offset:2px}
+.co-ship{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px;padding:16px;border:1px dashed var(--line-l);border-radius:12px}
+.co-ship[hidden]{display:none}
+.co-ship legend{padding:0 6px;font-size:12px;font-weight:600;color:var(--ink)}
+.co-error{min-height:20px;margin-top:14px;font-size:14px;color:#c0392b}
+.co-submit{width:100%;height:48px;margin-top:6px}
+
 /* very wide screens: keep content inside the 1920px grid */
 @media (min-width:1921px){
   :root{--in:calc((100vw - 1920px) / 2 + 96px)}
@@ -354,6 +378,8 @@ dialog.order::backdrop{background:rgba(10,10,10,.55)}
   .bio-pic{max-width:200px;position:static}
   .bio-body{padding-top:0}
   .bio-body h3{font-size:32px}
+  .co-fields,.co-ship{grid-template-columns:1fr}
+  .co-head{padding-right:0;margin-top:28px}
   .hero-title{font-size:min(9.4vw,48px)}
   .logo{font-size:16px}
   .menu-inner{padding:110px var(--in) 32px}
