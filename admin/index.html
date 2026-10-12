@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Fenomenal Admin</title>
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <section id="login" class="login">
+    <form id="loginForm">
+      <h1>Fenomenal<small>admin</small></h1>
+      <input id="email" type="email" placeholder="Email" autocomplete="username" required>
+      <input id="password" type="password" placeholder="Heslo" autocomplete="current-password" required>
+      <button class="btn" type="submit">Prihlásiť</button>
+      <p id="loginErr" class="err" role="alert"></p>
+    </form>
+  </section>
+
+  <div id="app" hidden>
+    <aside>
+      <h2>Fenomenal</h2>
+      <nav id="tabs"></nav>
+      <button id="logout" class="link">Odhlásiť</button>
+    </aside>
+    <main>
+      <header><h1 id="title"></h1><button id="addBtn" class="btn">+ Pridať</button></header>
+      <table id="table"></table>
+    </main>
+  </div>
+
+  <dialog id="dlg">
+    <form id="form" method="dialog"></form>
+  </dialog>
+  <script src="config.js"></script>
+  <script type="module" src="admin.js"></script>
+</body>
+</html>

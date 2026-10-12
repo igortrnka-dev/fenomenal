@@ -1,0 +1,55 @@
+# Render Blueprint: New → Blueprint → vyber tento repozitár.
+# Jediná tajná hodnota (SUPABASE_SERVICE_KEY) sa zadáva v Render dashboarde, nie sem.
+services:
+  - type: web
+    name: fenomenal-api
+    runtime: node
+    plan: free
+    region: frankfurt
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: SUPABASE_URL
+        value: https://bozdsllwvgtxtssbnmzl.supabase.co
+      # verejný (anon) kľúč — nie je tajný, prístup obmedzujú RLS pravidlá v databáze
+      - key: SUPABASE_ANON_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJvemRzbGx3dmd0eHRzc2JubXpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE4MTI2NTMsImV4cCI6MjEwNzM4ODY1M30.q51IerdmjIP1-Saw5g-9zJB2bUyEyGjxcAuUt-Ms1s8
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: ADMIN_EMAILS
+        value: igor.trnka@mrmindustry.com
+      - key: CORS_ORIGINS
+        value: https://fenomenal-web.onrender.com,https://fenomenal-admin.onrender.com
+
+  - type: web
+    name: fenomenal-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: ""
+    staticPublishPath: .
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /img/*
+        name: Cache-Control
+        value: public, max-age=604800
+      - path: /fonts/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+
+  - type: web
+    name: fenomenal-admin
+    runtime: static
+    rootDir: admin
+    buildCommand: ""
+    staticPublishPath: .
+    headers:
+      - path: /*
+        name: X-Robots-Tag
+        value: noindex

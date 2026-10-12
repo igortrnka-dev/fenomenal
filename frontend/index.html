@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#fafafa">
+  <title>FENOMENAL — Rap Crew zo Slovenska</title>
+  <meta name="description" content="Fenomenal — slovenská rap crew. Hudba, merch e-shop a galéria. Počúvaj, nakupuj, objav.">
+  <link rel="preload" href="fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="img/hero-blur.jpg" as="image" fetchpriority="high">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="noise" aria-hidden="true"></div>
+
+  <!-- Preloader: písmená prilietajú sprava, potom celá opona odíde hore -->
+  <div class="loader" id="loader" aria-hidden="true">
+    <div class="loader-curtain" id="loaderCurtain">
+      <div class="grid-lines"><i></i><i></i><i></i></div>
+      <div class="loader-band">
+        <span class="plus" style="left:48px;top:-5px"></span><span class="plus" style="right:48px;top:-5px"></span>
+        <span class="plus" style="left:48px;bottom:-5px"></span><span class="plus" style="right:48px;bottom:-5px"></span>
+        <p class="loader-word" data-chars>FENOMENAL®</p>
+      </div>
+    </div>
+  </div>
+
+  <header class="nav" id="nav">
+    <a href="#top" class="logo">FENOMENAL®</a>
+    <div class="nav-actions">
+      <button class="nav-btn" id="cartOpen" aria-label="Otvoriť košík"><span class="cart-txt">Košík</span> <span id="cartCount">0</span></button>
+      <button class="nav-btn menu-btn" id="menuOpen" aria-label="Menu" aria-expanded="false" aria-controls="menu">
+        <span class="menu-txt">Menu</span><span class="dots" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Fullscreen menu -->
+  <div class="menu" id="menu" aria-hidden="true">
+    <div class="grid-lines"><i></i><i></i><i></i></div>
+    <div class="menu-inner">
+      <p class="menu-quote" data-menu-appear="0.2">Ulica počúva.<br>My <span class="hl">hovoríme nahlas</span>.</p>
+      <div class="menu-row">
+        <div class="menu-meta" data-menu-appear="0.4">
+          <p class="meta-loc">Rap crew — Bratislava, SK <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1a3.5 3.5 0 0 0-3.5 3.5C2.5 7.2 6 11 6 11s3.5-3.8 3.5-6.5A3.5 3.5 0 0 0 6 1Zm0 4.8a1.3 1.3 0 1 1 0-2.6 1.3 1.3 0 0 1 0 2.6Z" fill="currentColor"/></svg></p>
+          <p class="clock"><span data-date></span><br><span data-time></span></p>
+        </div>
+        <nav class="menu-links" aria-label="Hlavná navigácia" data-menu-appear="0.6">
+          <span class="plus rot"></span>
+          <a href="#top">Domov</a>
+          <a href="#crew">Crew</a>
+          <a href="#music">Hudba</a>
+          <a href="#shop">Shop</a>
+        </nav>
+      </div>
+      <div class="menu-foot" data-menu-appear="0.8">
+        <p class="menu-big">Fenomenal</p>
+        <p class="muted">Slovenský rap • Merch • Tour 2026</p>
+      </div>
+    </div>
+  </div>
+
+  <main id="top">
+    <!-- HERO -->
+    <section class="hero card dark" data-theme="dark" id="hero">
+      <div class="hero-bg" id="heroBg">
+        <!-- vopred rozmazaná verzia (namiesto živého filter: blur) -->
+        <img class="hero-blur" src="img/hero-blur.jpg" width="1200" height="1200" alt="Fenomenal crew s logom" fetchpriority="high" decoding="async">
+        <!-- ostrá vrstva, odkrytá maskou okolo kurzora -->
+        <div class="hero-focus" id="heroFocus" aria-hidden="true"><picture><source type="image/avif" srcset="img/hero-1200.avif 1200w, img/hero.avif 2400w" sizes="100vw"><img src="img/hero.jpg" srcset="img/hero-1200.jpg 1200w, img/hero.jpg 2400w" sizes="100vw" width="2400" height="2400" alt="" loading="lazy" decoding="async"></picture></div>
+        <!-- glitch prebliknutia ďalších fotiek (vrstvy dopĺňa script.js) -->
+        <div class="hero-glitch" id="heroGlitch" aria-hidden="true"></div>
+      </div>
+      <div class="hero-shade" aria-hidden="true"></div>
+      <div class="grid-lines"><i></i><i></i><i></i></div>
+      <div class="hero-inner">
+        <div class="hero-top">
+          <div class="hero-meta">
+            <p class="meta-loc" data-appear="1.6">Rap crew — Bratislava, SK <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1a3.5 3.5 0 0 0-3.5 3.5C2.5 7.2 6 11 6 11s3.5-3.8 3.5-6.5A3.5 3.5 0 0 0 6 1Zm0 4.8a1.3 1.3 0 1 1 0-2.6 1.3 1.3 0 0 1 0 2.6Z" fill="currentColor"/></svg></p>
+            <p class="clock" data-appear="1.8"><span data-date></span><br><span data-time></span></p>
+          </div>
+          <ul class="hero-list" data-appear="2.6">
+            <li><a href="#crew">Crew</a><span class="plus rot"></span></li>
+            <li><a href="#music">Hudba</a></li>
+            <li><a href="#shop">Shop</a><span class="plus rot"></span></li>
+          </ul>
+        </div>
+        <div class="hero-bottom">
+          <div>
+            <h1 class="hero-title" data-appear="2">Zo Slovenska.<br>Pre ulicu.</h1>
+            <p class="hero-sub" data-appear="2.3">Slovenská rap crew. Underground sound, surová energia a texty z ulice. Album FENOMENAL je vonku.</p>
+          </div>
+          <div class="hero-cta">
+            <a class="fx-btn std" href="#music" data-appear="2.4">Počúvaj</a>
+            <a class="fx-btn light" href="#shop" data-appear="2.6">Kúpiť CD</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HUDBA -->
+    <section class="sec card dark" data-theme="dark" id="music">
+      <div class="grid-lines four"><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="sec-head">
+        <p class="label"><i></i>Hudba</p>
+        <div class="cols">
+          <h2>Počúvaj<br>nahlas</h2>
+          <p class="lead">Album FENOMENAL na Spotify,<br><span class="hl">pusti si ho celý</span>.</p>
+        </div>
+      </div>
+      <div class="player">
+        <div class="player-list" id="playlist" role="tablist" aria-label="Výber playlistu"></div>
+        <div class="player-embed" data-st-scale="1.2,1" data-st-spring=".3,0,200,60">
+          <!-- CSS imitácia Spotify prehrávača; skutočný iframe (~850 KB, 8 domén) sa načíta až po kliknutí -->
+          <button class="sp-facade" id="spotify" type="button" aria-label="Načítať Spotify prehrávač">
+            <span class="sp-cover" aria-hidden="true"></span>
+            <span class="sp-meta"><b class="sp-title" id="spTitle">Playlist</b><small>Spotify • <span id="spSub">Playlist</span></small></span>
+            <span class="sp-logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 1.5a10.5 10.5 0 1 0 0 21 10.5 10.5 0 0 0 0-21Zm4.8 15.15a.66.66 0 0 1-.9.22c-2.47-1.5-5.58-1.85-9.24-1.01a.66.66 0 1 1-.29-1.28c4-.92 7.44-.52 10.21 1.17.31.19.41.6.22.9Zm1.29-2.86a.82.82 0 0 1-1.13.27c-2.83-1.74-7.14-2.24-10.48-1.23a.82.82 0 1 1-.48-1.57c3.82-1.16 8.57-.6 11.82 1.4.39.24.51.75.27 1.13Zm.11-2.98C14.8 8.8 9.18 8.6 5.94 9.6a.99.99 0 1 1-.57-1.89c3.72-1.13 9.92-.91 13.84 1.41a.99.99 0 0 1-1.01 1.7Z"/></svg></span>
+            <span class="sp-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="currentColor" d="M8 5.5v13l11-6.5z"/></svg></span>
+            <span class="sp-rows" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+            <span class="sp-hint">Klikni pre načítanie prehrávača</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- CREW: lepkavé karty, ktoré sa prekrývajú -->
+    <section class="crew" id="crew" data-theme="dark">
+      <div class="sec card dark crew-intro">
+        <div class="grid-lines four"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="sec-head">
+          <p class="label"><i></i>Crew</p>
+          <div class="cols">
+            <h2>Tváre za<br>mikrofónom</h2>
+            <p class="lead">Traja ľudia, jeden zvuk,<br><span class="hl">jedna ulica</span>.</p>
+          </div>
+        </div>
+      </div>
+      <div class="crew-stack" id="crewGrid">
+        <article class="member" data-theme="dark">
+          <div class="member-bg"><img src="img/komarko-blur.jpg" width="480" height="480" alt="" loading="lazy" decoding="async" data-st-scale="1.4,1" data-st-spring=".3,0,200,60"></div>
+          <div class="grid-lines four"><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="member-inner">
+            <div class="member-text"><small>Člen 01</small><h3>Komarko</h3></div>
+            <div class="member-pic"><picture><source type="image/avif" srcset="img/komarko.avif"><img src="img/komarko.jpg" alt="Komarko" loading="lazy" decoding="async" data-st-scale="1.2,1" data-st-spring=".3,0,200,60"></picture></div>
+            <div class="member-side"><span>Bratislava</span><b>01</b></div>
+          </div>
+        </article>
+        <article class="member" data-theme="dark">
+          <div class="member-bg"><img src="img/mash1k-blur.jpg" width="480" height="480" alt="" loading="lazy" decoding="async" data-st-scale="1.4,1" data-st-spring=".3,0,200,60"></div>
+          <div class="grid-lines four"><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="member-inner">
+            <div class="member-text"><small>Člen 02</small><h3>Mash1k</h3></div>
+            <div class="member-pic"><picture><source type="image/avif" srcset="img/mash1k.avif"><img src="img/mash1k.jpg" alt="Mash1k" loading="lazy" decoding="async" data-st-scale="1.2,1" data-st-spring=".3,0,200,60"></picture></div>
+            <div class="member-side"><span>Bratislava</span><b>02</b></div>
+          </div>
+        </article>
+        <article class="member" data-theme="dark">
+          <div class="member-bg"><img src="img/badman-blur.jpg" width="480" height="480" alt="" loading="lazy" decoding="async" data-st-scale="1.4,1" data-st-spring=".3,0,200,60"></div>
+          <div class="grid-lines four"><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="member-inner">
+            <div class="member-text"><small>Člen 03</small><h3>BADMAN</h3></div>
+            <div class="member-pic"><picture><source type="image/avif" srcset="img/badman.avif"><img src="img/badman.jpg" alt="BADMAN" loading="lazy" decoding="async" data-st-scale="1.2,1" data-st-spring=".3,0,200,60"></picture></div>
+            <div class="member-side"><span>Bratislava</span><b>03</b></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- SHOP -->
+    <section class="sec light" data-theme="light" id="shop">
+      <div class="grid-lines"><i></i><i></i><i></i></div>
+      <div class="hr"><span class="plus"></span><span class="plus"></span><span class="plus"></span></div>
+      <div class="sec-head">
+        <p class="label"><i></i>E-shop</p>
+        <div class="cols">
+          <h2>Album<br>na CD</h2>
+          <p class="lead">Album FENOMENAL ako fyzické CD,<br><span class="hl">priamo od nás</span>.</p>
+        </div>
+      </div>
+      <div class="shop" id="shopGrid"></div>
+    </section>
+
+  </main>
+
+  <footer class="footer card dark" data-theme="dark">
+    <div class="grid-lines"><i></i><i></i><i></i></div>
+    <div class="footer-inner">
+      <p class="footer-quote">Mikrofón zachytí hlas.<br>Ulica <span class="hl">rozhodne, čo platí</span>.</p>
+      <div class="footer-row">
+        <div class="menu-meta">
+          <p class="meta-loc">Rap crew — Bratislava, SK <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1a3.5 3.5 0 0 0-3.5 3.5C2.5 7.2 6 11 6 11s3.5-3.8 3.5-6.5A3.5 3.5 0 0 0 6 1Zm0 4.8a1.3 1.3 0 1 1 0-2.6 1.3 1.3 0 0 1 0 2.6Z" fill="currentColor"/></svg></p>
+          <p class="clock"><span data-date></span><br><span data-time></span></p>
+        </div>
+        <nav class="menu-links" aria-label="Pätička">
+          <a href="#top">Domov</a>
+          <a href="#crew">Crew</a>
+          <a href="#music">Hudba</a>
+          <a href="#shop">Shop</a>
+        </nav>
+      </div>
+      <svg class="footer-word" viewBox="0 0 1000 150" aria-hidden="true"><text x="0" y="128" textLength="1000" lengthAdjust="spacingAndGlyphs">FENOMENAL®</text></svg>
+      <div class="footer-legal">
+        <p>© 2026 Fenomenal s. r. o. • Svetlá 4220/1, 811 02 Bratislava • IČO 57919429<br>Zapísaná v Obchodnom registri Mestského súdu Bratislava III, odd. Sro, vl. č. 204609/B</p>
+        <nav aria-label="Právne informácie">
+          <a href="ochrana-osobnych-udajov.html">Ochrana osobných údajov</a>
+          <button type="button" data-cookie-settings>Nastavenia cookies</button>
+        </nav>
+      </div>
+    </div>
+  </footer>
+
+  <aside class="drawer" id="drawer" aria-label="Košík" aria-hidden="true">
+    <div class="drawer-head"><h3>Košík</h3><button id="cartClose" aria-label="Zavrieť košík">Zavrieť ✕</button></div>
+    <ul id="cartItems"></ul>
+    <div class="drawer-foot">
+      <p>Spolu <strong id="cartTotal">0 €</strong></p>
+      <button class="fx-btn std" id="checkout">Objednať</button>
+    </div>
+  </aside>
+  <div class="overlay" id="overlay"></div>
+
+  <!-- Karta objednávky: výber počtu kusov -->
+  <dialog class="order" id="order" aria-labelledby="orderTitle">
+    <div class="order-card">
+      <button class="order-close" id="orderClose" type="button" aria-label="Zavrieť">Zavrieť ✕</button>
+      <div class="order-pic" id="orderPic"></div>
+      <div class="order-body">
+        <p class="label"><i></i>Objednávka</p>
+        <h3 id="orderTitle"></h3>
+        <p class="order-sub" id="orderSub"></p>
+        <div class="order-row">
+          <span>Počet kusov</span>
+          <div class="stepper">
+            <button type="button" data-step="-1" aria-label="Menej kusov">−</button>
+            <output id="orderQty" aria-live="polite">1</output>
+            <button type="button" data-step="1" aria-label="Viac kusov">+</button>
+          </div>
+        </div>
+        <div class="order-row order-total"><span>Spolu</span><strong id="orderTotal"></strong></div>
+        <button class="fx-btn std ink" id="orderAdd" type="button">Pridať do košíka</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status"></div>
+  <script src="config.js"></script>
+  <script type="module" src="script.js"></script>
+</body>
+</html>
