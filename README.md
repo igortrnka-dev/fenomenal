@@ -10,7 +10,7 @@ supabase/   schema.sql                   → Supabase (Postgres + Storage)
 ```
 frontend ──GET /api/*──┐
                        ├─► backend (Render) ──service key──► Supabase (DB + Storage)
-admin ──/api/admin/*───┘      ▲ overuje Supabase JWT + ADMIN_EMAILS
+admin ──/api/admin/*───┘      ▲ overuje admin secret key (ADMIN_KEY_HASHES)
 ```
 
 ## Nasadenie (Render)
@@ -22,7 +22,7 @@ admin ──/api/admin/*───┘      ▲ overuje Supabase JWT + ADMIN_EMAIL
 4. Over adresy služieb. Ak Render pridal k názvu príponu (napr. `fenomenal-api-x1y2.onrender.com`), uprav:
    - `frontend/config.js` a `admin/config.js` → `API_URL` (a `SITE_URL` v admine),
    - `CORS_ORIGINS` pri `fenomenal-api` (v Render → Environment).
-5. Supabase: v *Authentication → Users* vytvor admin účet s e-mailom z `ADMIN_EMAILS`.
+5. Admin: prihlásenie secret keyom. Na serveri sú len SHA-256 hashe kľúčov v `ADMIN_KEY_HASHES`; kľúč zneplatníš odstránením jeho hashu.
 
 Free plán uspí backend po ~15 min nečinnosti. Prvé načítanie potom trvá ~30 s, web medzitým zobrazí statické dáta.
 

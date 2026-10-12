@@ -4,3 +4,4 @@ node_modules/
 !.env.example
 .backup/
 .DS_Store
+backend/admin-keys.txt

@@ -28,7 +28,7 @@ const imgSrc = u => !u ? '' : /^https?:/.test(u) ? u : `${(window.FEN_CONFIG.SIT
 $('#loginForm').onsubmit = async e => {
   e.preventDefault(); $('#loginErr').textContent = '';
   try {
-    const r = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: $('#email').value, password: $('#password').value }) });
+    const r = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: $('#key').value }) });
     const d = await r.json(); if (!r.ok) throw new Error(d.error);
     token = d.token; sessionStorage.setItem('fen-token', token); start();
   } catch (err) { $('#loginErr').textContent = err.message; }

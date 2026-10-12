@@ -18,8 +18,11 @@ services:
         value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJvemRzbGx3dmd0eHRzc2JubXpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE4MTI2NTMsImV4cCI6MjEwNzM4ODY1M30.q51IerdmjIP1-Saw5g-9zJB2bUyEyGjxcAuUt-Ms1s8
       - key: SUPABASE_SERVICE_KEY
         sync: false
-      - key: ADMIN_EMAILS
-        value: igor.trnka@mrmindustry.com
+      # SHA-256 hashe admin secret keys (samotné kľúče nie sú v repozitári)
+      - key: ADMIN_KEY_HASHES
+        value: 0e215ce9f78d6accc98479fb3e597548f43fd19ac31d925ab0fc5eb1532ba1af,be485d32d2ecdbcc22c7afd232c42d2d55b099c40925acd258ab865ebb618836,67b86c761fc667f1f2a0489ef6fefdc033276a3272eedb204373d69f67d1bf1c,0cd226bbe04040b7c513f69febcae80d8f8508f51d8a7c5ab80a8bda5bf7248f,5be6a3b26adc1e5f92741d9b87e92f8e3046c8d5cd815a736463d58c11786636,e8bb4c4cac9eeb06e48f629917098b5d228f3764d03e21b147272e1451ff63db,3107ed88c677eedf9c01bcad5da6c5bdb933b6ae333e84bf9595862c3ab41d46,bec1dd86a6476ea001a49a77bedfecc5752eac2f70ea0cf9116c60e042948f16,3e7ff3807e438d260b8a06cab7fd25037c5121f60935000c5d0720dadad223b4,a643af5e6c65bebbe5a6fb255f70efa7b6072995825d5d5fd5df959a55b8f6cf
+      - key: ADMIN_SESSION_SECRET
+        generateValue: true
       - key: CORS_ORIGINS
         value: https://www.fenomenal.wtf,https://fenomenal.wtf,https://fenomenal-web.onrender.com,https://fenomenal-admin.onrender.com
       - key: SITE_URL

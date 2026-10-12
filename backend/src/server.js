@@ -7,7 +7,7 @@ import Stripe from 'stripe';
 
 const {
   SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_ANON_KEY,
-  ADMIN_EMAILS = '', CORS_ORIGINS = '', PORT = 3000,
+  ADMIN_KEY_HASHES = '', ADMIN_SESSION_SECRET = '', CORS_ORIGINS = '', PORT = 3000,
   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, SITE_URL = 'http://localhost:5173'
 } = process.env;
 const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
@@ -20,7 +20,12 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !SUPABASE_ANON_KEY) {
 const db = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { auth: { persistSession: false } });
 const ANON_OPTS = { auth: { persistSession: false, autoRefreshToken: false } };
 const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, ANON_OPTS); // stateless: never holds a user session
-const admins = ADMIN_EMAILS.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+// SHA-256 hashes of the admin secret keys; the keys themselves never live on the server
+const adminKeys = ADMIN_KEY_HASHES.split(',').map(s => s.trim().toLowerCase()).filter(s => /^[0-9a-f]{64}$/.test(s));
+if (adminKeys.length && ADMIN_SESSION_SECRET.length < 32) {
+  console.error('ADMIN_SESSION_SECRET musí mať aspoň 32 znakov');
+  process.exit(1);
+}
 const origins = CORS_ORIGINS.split(',').map(s => s.trim()).filter(Boolean);
 
 /* ---------- Validation helpers ---------- */
@@ -333,27 +338,27 @@ app.post('/api/order/:session/shipping', limit('order', 30, 10 * 60_000), noStor
 }));
 
 /* ---------- Auth ---------- */
+const SESSION_TTL = 12 * 60 * 60_000; // ms
+const sha256 = v => crypto.createHash('sha256').update(v).digest('hex');
+const sign = v => crypto.createHmac('sha256', ADMIN_SESSION_SECRET).update(v).digest('base64url');
+const sameStr = (a, b) => a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+
 app.post('/api/auth/login', limit('login', 5, 15 * 60_000), noStore, wrap(async (req, res) => {
-  const { email, password } = req.body || {};
-  if (!isStr(email) || !isStr(password) || email.length > 254 || password.length > 200) throw fail(400, 'Neplatné prihlásenie');
-  const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, ANON_OPTS); // one-off client per login
-  const { data, error } = await client.auth.signInWithPassword({ email, password });
-  if (error || !admins.includes((data.user?.email || '').toLowerCase())) {
-    if (data?.session) await client.auth.signOut().catch(() => {}); // a valid non-admin account gets nothing
-    throw fail(401, 'Neplatné prihlásenie');
-  }
-  res.json({ token: data.session.access_token, email: data.user.email });
+  const { key } = req.body || {};
+  if (!isStr(key) || key.length > 200) throw fail(400, 'Neplatný kľúč');
+  const hash = sha256(key.trim());
+  if (!adminKeys.some(h => sameStr(h, hash))) throw fail(401, 'Neplatný kľúč');
+  // token = <key id>.<expiry>.<hmac>; the key id lets a removed key revoke its sessions
+  const payload = `${hash.slice(0, 16)}.${Date.now() + SESSION_TTL}`;
+  res.json({ token: `${payload}.${sign(payload)}` });
 }));
 
-// Verified against Supabase Auth on every request (expired/revoked tokens fail), then checked against ADMIN_EMAILS
+// Signature, expiry, and that the key is still listed in ADMIN_KEY_HASHES
 const adminOnly = (req, res, next) => {
-  const m = /^Bearer ([A-Za-z0-9._-]{20,4096})$/.exec(req.headers.authorization || '');
-  if (!m) return res.status(401).json({ error: 'Unauthorized' });
-  authClient.auth.getUser(m[1]).then(({ data, error }) => {
-    if (error || !data.user || !admins.includes((data.user.email || '').toLowerCase()))
-      return res.status(401).json({ error: 'Unauthorized' });
-    next();
-  }).catch(() => res.status(401).json({ error: 'Unauthorized' }));
+  const m = /^Bearer ([0-9a-f]{16})\.(\d{13})\.([A-Za-z0-9_-]{43})$/.exec(req.headers.authorization || '');
+  const ok = m && sameStr(sign(`${m[1]}.${m[2]}`), m[3]) && +m[2] > Date.now() && adminKeys.some(h => h.startsWith(m[1]));
+  if (!ok) return res.status(401).json({ error: 'Unauthorized' });
+  next();
 };
 app.use('/api/admin', limit('admin', 300, 5 * 60_000), noStore, adminOnly);
 
