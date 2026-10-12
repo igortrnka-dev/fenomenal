@@ -424,12 +424,66 @@ $('#checkout').onclick = async () => {
     btn.disabled = false;
   }
 };
-// Back from Stripe
+// Back from Stripe. A paid order still needs a shipping address: the form opens now and on every
+// next visit until it is confirmed (the session id waits in localStorage).
+const PENDING = 'fen-pending-order';
+const ship = $('#ship'), shipForm = $('#shipForm');
+const shipErr = msg => { $('#shipError').textContent = msg || ''; };
+async function openShipping(sessionId) {
+  let info = null;
+  try {
+    const r = await fetch(`${API}/api/order/${encodeURIComponent(sessionId)}`, { signal: AbortSignal.timeout(30000) });
+    info = await r.json().catch(() => ({}));
+    if (r.status === 400 || r.status === 404) { localStorage.removeItem(PENDING); return toast('Objednávku sa nepodarilo overiť. Napíš nám prosím.', 6000); }
+    if (!r.ok) throw new Error(info.error);
+  } catch { info = null; } // API asleep/unreachable: show the form anyway, submit will retry
+  if (info?.confirmed) { localStorage.removeItem(PENDING); return toast('Ďakujeme! Adresu už máme, CD čoskoro posielame.', 5000); }
+  shipForm.reset();
+  shipErr();
+  const sh = info?.shipping || {};
+  for (const k of ['name', 'street', 'zip', 'city', 'phone']) if (sh[k]) shipForm.elements[k].value = sh[k];
+  if (sh.country) shipForm.elements.country.value = sh.country;
+  $('#shipSub').textContent = info?.email
+    ? `Platba ${String(info.amount).replace('.', ',')} € prebehla. Potvrdenie sme poslali na ${info.email}. Vyplň, kam ti máme CD poslať.`
+    : 'Vyplň doručovacie údaje, nech vieme, kam zásielku poslať.';
+  ship.dataset.session = sessionId;
+  if (!ship.open) { ship.showModal(); appear($('.ship-card', ship), { y: 24, duration: 0.8 }); }
+}
+shipForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  shipForm.querySelectorAll('.invalid').forEach(el => el.classList.remove('invalid'));
+  const data = Object.fromEntries(new FormData(shipForm));
+  const empty = ['name', 'street', 'zip', 'city', 'phone'].filter(k => !data[k].trim());
+  if (empty.length) { empty.forEach(k => shipForm.elements[k].classList.add('invalid')); return shipErr('Vyplň prosím všetky povinné údaje.'); }
+  const btn = $('#shipSubmit'); btn.disabled = true; shipErr();
+  try {
+    const r = await fetch(`${API}/api/order/${encodeURIComponent(ship.dataset.session)}/shipping`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), signal: AbortSignal.timeout(30000)
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      (d.missing || []).forEach(k => shipForm.elements[k]?.classList.add('invalid'));
+      throw new Error(r.status < 500 && d.error ? d.error : 'Adresu sa nepodarilo uložiť. Skús to prosím o chvíľu znova.');
+    }
+    localStorage.removeItem(PENDING);
+    ship.close();
+    toast('Ďakujeme! Adresu máme, CD čoskoro posielame.', 6000);
+  } catch (err) {
+    shipErr(err.name === 'TimeoutError' || err instanceof TypeError ? 'Server sa práve prebúdza, skús to o chvíľu znova.' : err.message);
+  } finally { btn.disabled = false; }
+});
+$('#shipLater').onclick = () => { ship.close(); toast('Adresu ti pripomenieme pri ďalšej návšteve.', 4000); };
+ship.addEventListener('cancel', e => e.preventDefault()); // Esc must not silently drop the form
 {
   const q = new URLSearchParams(location.search);
-  if (q.get('order') === 'success') { cart = []; saveCart(); toast('Ďakujeme! Platba prebehla, potvrdenie príde e-mailom.', 6000); }
+  if (q.get('order') === 'success') {
+    cart = []; saveCart();
+    if (q.get('session_id')) localStorage.setItem(PENDING, q.get('session_id'));
+  }
   if (q.get('order') === 'cancel') toast('Platba bola zrušená, košík ti ostal.', 4000);
   if (q.has('order')) history.replaceState(null, '', location.pathname + location.hash);
+  const pending = localStorage.getItem(PENDING);
+  if (pending) setTimeout(() => openShipping(pending), q.get('order') === 'success' ? 600 : 4200);
 }
 renderCart();
 

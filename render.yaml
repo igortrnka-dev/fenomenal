@@ -21,9 +21,9 @@ services:
       - key: ADMIN_EMAILS
         value: igor.trnka@mrmindustry.com
       - key: CORS_ORIGINS
-        value: https://fenomenal-web.onrender.com,https://fenomenal-admin.onrender.com
+        value: https://www.fenomenal.wtf,https://fenomenal.wtf,https://fenomenal-web.onrender.com,https://fenomenal-admin.onrender.com
       - key: SITE_URL
-        value: https://fenomenal-web.onrender.com
+        value: https://www.fenomenal.wtf
       # Stripe: tajné hodnoty zadaj v Render dashboarde
       - key: STRIPE_SECRET_KEY
         sync: false

@@ -49,17 +49,20 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
       const s = event.data.object;
       if (s.payment_status === 'paid') {
         const { data: lines } = await stripe.checkout.sessions.listLineItems(s.id, { limit: 100 });
-        const { error } = await db.from('orders').upsert({
+        const { data: existing } = await db.from('orders').select('shipping').eq('stripe_session_id', s.id).maybeSingle();
+        const row = {
           stripe_session_id: s.id,
           status: 'paid',
           email: s.customer_details?.email,
-          name: s.customer_details?.name,
-          phone: s.customer_details?.phone,
-          shipping: s.collected_information?.shipping_details ?? s.shipping_details ?? null,
           items: lines.map(l => ({ name: l.description, qty: l.quantity, amount: l.amount_total / 100 })),
           amount_total: s.amount_total / 100,
           currency: s.currency
-        }, { onConflict: 'stripe_session_id' });
+        };
+        // never overwrite an address the customer already confirmed in the shipping form
+        if (!existing?.shipping?.confirmed) {
+          Object.assign(row, { name: s.customer_details?.name, phone: s.customer_details?.phone, shipping: fromStripe(s) });
+        }
+        const { error } = await db.from('orders').upsert(row, { onConflict: 'stripe_session_id' });
         if (error) throw error;
       }
     }
@@ -130,6 +133,63 @@ app.post('/api/checkout', wrap(async (req, res) => {
     cancel_url: `${SITE_URL}/?order=cancel#shop`
   });
   res.json({ url: session.url });
+}));
+
+/* ---------- Shipping details after payment ---------- */
+// The customer comes back from Stripe with ?session_id=… — we verify the payment with Stripe
+// before showing or saving anything, so only paid orders can submit an address.
+const SESSION_RE = /^cs_(test|live)_[A-Za-z0-9]{10,200}$/;
+async function paidSession(id) {
+  if (!stripe) throw Object.assign(new Error('Platby zatiaľ nie sú nastavené'), { status: 503 });
+  if (!SESSION_RE.test(id || '')) throw Object.assign(new Error('Neplatná objednávka'), { status: 400 });
+  let s;
+  try { s = await stripe.checkout.sessions.retrieve(id); }
+  catch { throw Object.assign(new Error('Objednávka sa nenašla'), { status: 404 }); }
+  if (s.payment_status !== 'paid') throw Object.assign(new Error('Objednávka zatiaľ nie je zaplatená'), { status: 409 });
+  return s;
+}
+const fromStripe = s => {
+  const sh = s.collected_information?.shipping_details ?? s.shipping_details;
+  if (!sh?.address?.line1) return null;
+  const a = sh.address;
+  return { name: sh.name || s.customer_details?.name || '', street: [a.line1, a.line2].filter(Boolean).join(', '),
+    city: a.city || '', zip: a.postal_code || '', country: a.country || 'SK', phone: s.customer_details?.phone || '' };
+};
+
+app.get('/api/order/:session', wrap(async (req, res) => {
+  const s = await paidSession(req.params.session);
+  const { data: saved } = await db.from('orders').select('shipping').eq('stripe_session_id', s.id).maybeSingle();
+  res.json({
+    email: s.customer_details?.email || '',
+    amount: s.amount_total / 100,
+    currency: s.currency,
+    shipping: saved?.shipping?.street ? saved.shipping : fromStripe(s),
+    confirmed: !!saved?.shipping?.confirmed
+  });
+}));
+
+app.post('/api/order/:session/shipping', wrap(async (req, res) => {
+  const s = await paidSession(req.params.session);
+  const b = req.body || {};
+  const str = (v, max) => String(v ?? '').trim().slice(0, max);
+  const shipping = {
+    name: str(b.name, 120), street: str(b.street, 200), city: str(b.city, 100),
+    zip: str(b.zip, 12).replace(/\s+/g, ' '), country: ['SK', 'CZ'].includes(b.country) ? b.country : '',
+    phone: str(b.phone, 30), note: str(b.note, 500), confirmed: true, confirmed_at: new Date().toISOString()
+  };
+  const missing = ['name', 'street', 'city', 'zip', 'country', 'phone'].filter(k => !shipping[k]);
+  if (missing.length) return res.status(400).json({ error: 'Vyplň všetky povinné údaje', missing });
+  if (!/^[0-9 ]{4,8}$/.test(shipping.zip)) return res.status(400).json({ error: 'Neplatné PSČ', missing: ['zip'] });
+  if (!/^\+?[0-9 ()/-]{6,20}$/.test(shipping.phone)) return res.status(400).json({ error: 'Neplatné telefónne číslo', missing: ['phone'] });
+  const { data: lines } = await stripe.checkout.sessions.listLineItems(s.id, { limit: 100 });
+  const { error } = await db.from('orders').upsert({
+    stripe_session_id: s.id, status: 'paid',
+    email: s.customer_details?.email, name: shipping.name, phone: shipping.phone, shipping,
+    items: lines.map(l => ({ name: l.description, qty: l.quantity, amount: l.amount_total / 100 })),
+    amount_total: s.amount_total / 100, currency: s.currency
+  }, { onConflict: 'stripe_session_id' });
+  if (error) throw error;
+  res.json({ ok: true });
 }));
 
 /* ---------- Auth ---------- */

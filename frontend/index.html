@@ -132,7 +132,6 @@
           <p class="label"><i></i>Crew</p>
           <div class="cols">
             <h2>Tváre za<br>mikrofónom</h2>
-            <p class="lead">Traja ľudia, jeden zvuk,<br><span class="hl">jedna ulica</span>.</p>
           </div>
         </div>
       </div>
@@ -231,6 +230,31 @@
         <div class="bio-text" id="bioText"></div>
       </div>
     </div>
+  </dialog>
+
+  <!-- Doručovacie údaje po úspešnej platbe -->
+  <dialog class="order ship" id="ship" aria-labelledby="shipTitle">
+    <form class="order-card ship-card" id="shipForm" novalidate>
+      <div class="ship-head">
+        <p class="label"><i></i>Platba prebehla ✓</p>
+        <h3 id="shipTitle">Kam ti máme poslať CD?</h3>
+        <p class="order-sub" id="shipSub">Vyplň doručovacie údaje, nech vieme, kam zásielku poslať.</p>
+      </div>
+      <div class="ship-fields">
+        <label class="f-full">Meno a priezvisko<input name="name" autocomplete="name" required maxlength="120"></label>
+        <label class="f-full">Ulica a číslo domu<input name="street" autocomplete="street-address" required maxlength="200"></label>
+        <label>PSČ<input name="zip" autocomplete="postal-code" inputmode="numeric" required maxlength="12"></label>
+        <label class="f-wide">Mesto<input name="city" autocomplete="address-level2" required maxlength="100"></label>
+        <label>Krajina<select name="country" autocomplete="country" required><option value="SK">Slovensko</option><option value="CZ">Česko</option></select></label>
+        <label class="f-wide">Telefón<input name="phone" type="tel" autocomplete="tel" required maxlength="30" placeholder="+421 …"></label>
+        <label class="f-full">Poznámka pre kuriéra <small>(nepovinné)</small><textarea name="note" rows="2" maxlength="500"></textarea></label>
+      </div>
+      <p class="ship-error" id="shipError" role="alert"></p>
+      <div class="ship-actions">
+        <button class="fx-btn std ink" type="submit" id="shipSubmit">Potvrdiť adresu</button>
+        <button class="ship-later" type="button" id="shipLater">Vyplním neskôr</button>
+      </div>
+    </form>
   </dialog>
 
   <!-- Karta objednávky: výber počtu kusov -->
