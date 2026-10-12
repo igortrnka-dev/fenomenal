@@ -186,9 +186,9 @@ $$('a', menu).forEach(a => a.addEventListener('click', () => setMenu(false)));
 let PLAYLISTS = [
   { title: 'FENOMENAL', sub: 'Album', type: 'album', id: '20yUeympd1xdHKamKavuJb' }
 ];
-// Only the album on CD for now. Price is a placeholder until the real one is confirmed.
+// Only the album on CD for now. payment_link = Stripe Payment Link used when the API checkout is unreachable.
 let PRODUCTS = [
-  { id: 101, name: 'FENOMENAL', sub: 'Album na CD', price: 15, img: 'img/cd.png' }
+  { id: 101, name: 'FENOMENAL', sub: 'Album na CD', price: 15, img: 'img/cd.png', payment_link: 'https://buy.stripe.com/14AcN47dAcadb7p6kX2sM00' }
 ];
 let MEMBERS = [];
 
@@ -299,9 +299,9 @@ loadPlaylist(0);
 /* ---------- Shop & cart ---------- */
 let cart = JSON.parse(localStorage.getItem('fen-cart') || '[]');
 const fmt = n => n + ' €';
-const toast = msg => {
+const toast = (msg, ms = 2000) => {
   const t = $('#toast'); t.textContent = msg; t.classList.add('show');
-  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2000);
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), ms);
 };
 $('#shopGrid').innerHTML = PRODUCTS.map(p => `
   <article class="product" data-id="${p.id}" data-st-opacity="0,1" data-st-spring="1,0,500,60">
@@ -379,10 +379,38 @@ const setDrawer = open => {
 };
 $('#cartOpen').onclick = () => setDrawer(true);
 $('#cartClose').onclick = $('#overlay').onclick = () => setDrawer(false);
-$('#checkout').onclick = () => {
+// Stripe Checkout: the backend creates the session from DB prices (exact quantities, shipping address).
+// If the API is unreachable, fall back to the product's Stripe Payment Link.
+$('#checkout').onclick = async () => {
   if (!cart.length) return toast('Košík je prázdny');
-  cart = []; saveCart(); setDrawer(false); toast('Díky! Objednávka odoslaná (demo)');
+  const btn = $('#checkout');
+  btn.disabled = true;
+  toast('Presmerovávam na platbu…', 8000);
+  try {
+    const r = await fetch(`${API}/api/checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: cart.map(c => ({ id: c.id, qty: c.qty })) }),
+      signal: AbortSignal.timeout(20000)
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.url) { location.href = d.url; return; }
+    if (r.status >= 400 && r.status < 500) throw Object.assign(new Error(d.error || 'Objednávku sa nepodarilo spracovať'), { user: true });
+    throw new Error(d.error || 'API nedostupné');
+  } catch (e) {
+    const link = PRODUCTS.find(p => cart.some(c => c.id === p.id) && p.payment_link)?.payment_link;
+    if (!e.user && link) { location.href = link; return; }
+    toast(e.user ? e.message : 'Platbu sa teraz nepodarilo spustiť, skús to o chvíľu.', 4000);
+    btn.disabled = false;
+  }
 };
+// Back from Stripe
+{
+  const q = new URLSearchParams(location.search);
+  if (q.get('order') === 'success') { cart = []; saveCart(); toast('Ďakujeme! Platba prebehla, potvrdenie príde e-mailom.', 6000); }
+  if (q.get('order') === 'cancel') toast('Platba bola zrušená, košík ti ostal.', 4000);
+  if (q.has('order')) history.replaceState(null, '', location.pathname + location.hash);
+}
 renderCart();
 
 addEventListener('keydown', e => {

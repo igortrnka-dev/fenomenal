@@ -8,7 +8,7 @@ const SCHEMA = {
   playlists: { label: 'Hudba', cols: ['title', 'sub', 'spotify_id'], fields: [['title', 'Názov', 'text'], ['sub', 'Podtitul', 'text'], ['type', 'Typ', 'select', ['playlist', 'album', 'artist', 'track']], ['spotify_id', 'Spotify ID', 'text'], ['sort', 'Poradie', 'number']] },
   events:    { label: 'Eventy', cols: ['date', 'title', 'city'], fields: [['title', 'Názov', 'text'], ['date', 'Dátum', 'date'], ['venue', 'Miesto', 'text'], ['city', 'Mesto', 'text'], ['ticket_url', 'Odkaz na lístky', 'text']] },
   news:      { label: 'Novinky', cols: ['img', 'date', 'title'], fields: [['title', 'Titulok', 'text'], ['body', 'Text', 'textarea'], ['date', 'Dátum', 'date'], ['img', 'Obrázok', 'image']] },
-  products:  { label: 'Shop', cols: ['img', 'name', 'sub', 'price'], fields: [['name', 'Názov', 'text'], ['sub', 'Podtitul', 'text'], ['price', 'Cena (€)', 'number'], ['img', 'Obrázok', 'image'], ['badge', 'Odznak', 'text'], ['sizes', 'Veľkosti (čiarkou)', 'sizes'], ['sort', 'Poradie', 'number']] },
+  products:  { label: 'Shop', cols: ['img', 'name', 'sub', 'price'], fields: [['name', 'Názov', 'text'], ['sub', 'Podtitul', 'text'], ['price', 'Cena (€)', 'number'], ['img', 'Obrázok', 'image'], ['badge', 'Odznak', 'text'], ['sizes', 'Veľkosti (čiarkou)', 'sizes'], ['payment_link', 'Stripe platobný odkaz (záloha)', 'text'], ['sort', 'Poradie', 'number']] },
   gallery:   { label: 'Galéria', cols: ['src', 'cap', 'cat'], fields: [['src', 'Obrázok', 'image'], ['cap', 'Popis', 'text'], ['cat', 'Kategória', 'select', ['crew', 'street']], ['sort', 'Poradie', 'number']] }
 };
 const IMG_COLS = new Set(['img', 'src']);

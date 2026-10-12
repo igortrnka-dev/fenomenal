@@ -3,11 +3,14 @@ import cors from 'cors';
 import multer from 'multer';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'node:crypto';
+import Stripe from 'stripe';
 
 const {
   SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_ANON_KEY,
-  ADMIN_EMAILS = '', CORS_ORIGINS = '', PORT = 3000
+  ADMIN_EMAILS = '', CORS_ORIGINS = '', PORT = 3000,
+  STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, SITE_URL = 'http://localhost:5173'
 } = process.env;
+const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !SUPABASE_ANON_KEY) {
   console.error('Chýbajú SUPABASE_URL / SUPABASE_SERVICE_KEY / SUPABASE_ANON_KEY');
@@ -25,11 +28,48 @@ const RESOURCES = {
   playlists: { fields: ['title', 'sub', 'type', 'spotify_id', 'sort', 'published'], order: 'sort' },
   events:    { fields: ['title', 'date', 'venue', 'city', 'ticket_url', 'sort', 'published'], order: 'date' },
   news:      { fields: ['title', 'body', 'date', 'img', 'sort', 'published'], order: 'date', desc: true },
-  products:  { fields: ['name', 'sub', 'price', 'img', 'badge', 'sizes', 'sort', 'published'], order: 'sort' },
+  products:  { fields: ['name', 'sub', 'price', 'img', 'badge', 'sizes', 'payment_link', 'sort', 'published'], order: 'sort' },
   gallery:   { fields: ['src', 'cat', 'cap', 'sort', 'published'], order: 'sort' }
 };
 
 const app = express();
+
+/* ---------- Stripe webhook (needs the raw body, so it is registered before express.json) ---------- */
+// Stripe → Developers → Webhooks → endpoint https://<api>/api/stripe/webhook, event checkout.session.completed
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  if (!stripe || !STRIPE_WEBHOOK_SECRET) return res.status(503).json({ error: 'Webhook nie je nastavený' });
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], STRIPE_WEBHOOK_SECRET);
+  } catch (e) {
+    return res.status(400).json({ error: `Neplatný podpis: ${e.message}` });
+  }
+  try {
+    if (['checkout.session.completed', 'checkout.session.async_payment_succeeded'].includes(event.type)) {
+      const s = event.data.object;
+      if (s.payment_status === 'paid') {
+        const { data: lines } = await stripe.checkout.sessions.listLineItems(s.id, { limit: 100 });
+        const { error } = await db.from('orders').upsert({
+          stripe_session_id: s.id,
+          status: 'paid',
+          email: s.customer_details?.email,
+          name: s.customer_details?.name,
+          phone: s.customer_details?.phone,
+          shipping: s.collected_information?.shipping_details ?? s.shipping_details ?? null,
+          items: lines.map(l => ({ name: l.description, qty: l.quantity, amount: l.amount_total / 100 })),
+          amount_total: s.amount_total / 100,
+          currency: s.currency
+        }, { onConflict: 'stripe_session_id' });
+        if (error) throw error;
+      }
+    }
+    res.json({ received: true });
+  } catch (e) {
+    console.error('Stripe webhook:', e);
+    res.status(500).json({ error: 'Webhook error' }); // Stripe retries on 5xx
+  }
+});
+
 app.use(cors({ origin: origins.length ? origins : true }));
 app.use(express.json({ limit: '1mb' }));
 
@@ -54,6 +94,42 @@ app.get('/api/:res', resource, wrap(async (req, res) => {
     .eq('published', true).order(req.cfg.order, { ascending: !req.cfg.desc });
   if (error) throw error;
   res.set('Cache-Control', 'public, max-age=30').json(data);
+}));
+
+/* ---------- Checkout (Stripe) ---------- */
+// Prices always come from the database, never from the browser.
+app.post('/api/checkout', wrap(async (req, res) => {
+  if (!stripe) return res.status(503).json({ error: 'Platby zatiaľ nie sú nastavené' });
+  const wanted = (Array.isArray(req.body?.items) ? req.body.items : [])
+    .map(i => ({ id: Number(i.id), qty: Math.floor(Number(i.qty)) }))
+    .filter(i => Number.isInteger(i.id) && i.qty >= 1 && i.qty <= 10);
+  if (!wanted.length) return res.status(400).json({ error: 'Košík je prázdny' });
+  const { data: products, error } = await authClient.from('products')
+    .select('id, name, sub, price, img').in('id', wanted.map(i => i.id));
+  if (error) throw error;
+  const line_items = wanted.map(w => {
+    const p = products.find(x => x.id === w.id);
+    if (!p) throw Object.assign(new Error('Produkt v košíku už neexistuje'), { status: 400 });
+    const images = SITE_URL.startsWith('https://') && p.img ? [new URL(p.img, SITE_URL + '/').href] : undefined;
+    return {
+      quantity: w.qty,
+      price_data: {
+        currency: 'eur',
+        unit_amount: Math.round(Number(p.price) * 100),
+        product_data: { name: p.sub ? `${p.name} — ${p.sub}` : p.name, ...(images && { images }) }
+      }
+    };
+  });
+  const session = await stripe.checkout.sessions.create({
+    mode: 'payment',
+    locale: 'sk',
+    line_items,
+    shipping_address_collection: { allowed_countries: ['SK', 'CZ'] },
+    phone_number_collection: { enabled: true },
+    success_url: `${SITE_URL}/?order=success&session_id={CHECKOUT_SESSION_ID}#shop`,
+    cancel_url: `${SITE_URL}/?order=cancel#shop`
+  });
+  res.json({ url: session.url });
 }));
 
 /* ---------- Auth ---------- */
