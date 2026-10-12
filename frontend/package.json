@@ -1,0 +1,12 @@
+{
+  "name": "fenomenal-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "vendor": "mkdir -p vendor && cp node_modules/swiper/swiper-bundle.min.js node_modules/swiper/swiper-bundle.min.css vendor/",
+    "postinstall": "npm run vendor"
+  },
+  "dependencies": {
+    "swiper": "^14.3.0"
+  }
+}
