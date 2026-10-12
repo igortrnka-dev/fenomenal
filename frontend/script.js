@@ -59,12 +59,18 @@ initParallax([{ el: $('#heroBg'), speed: 0.8 }]);
 // Mobile: looping video background (loaded only when the mobile layout is active)
 {
   const video = $('#heroVideo'), mq = matchMedia('(max-width: 809.98px)');
+  video.muted = video.defaultMuted = true; // muted is required for autoplay (iOS reads the property, not just the attribute)
+  const play = () => { if (mq.matches && !document.hidden && video.paused) video.play().catch(() => {}); };
   const sync = () => {
     if (!mq.matches) { video.pause(); return; }
-    if (!video.src) { video.src = video.dataset.src; video.preload = 'auto'; }
-    if (!reduced) video.play().catch(() => {});
+    if (!video.src) { video.src = video.dataset.src; video.preload = 'auto'; video.load(); }
+    play();
   };
   mq.addEventListener('change', sync);
+  video.addEventListener('canplay', play);
+  document.addEventListener('visibilitychange', play);
+  // if the browser blocked autoplay (e.g. iOS Low Power Mode), start on the first touch or scroll
+  ['touchstart', 'scroll', 'click'].forEach(ev => addEventListener(ev, play, { passive: true }));
   sync();
 }
 
