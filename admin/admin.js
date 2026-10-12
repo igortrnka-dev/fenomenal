@@ -4,7 +4,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 
 /* type: text | textarea | number | date | image | select | sizes(csv→array) */
 const SCHEMA = {
-  members:   { label: 'Crew', cols: ['img', 'name', 'bio'], fields: [['name', 'Meno', 'text'], ['bio', 'Popis', 'textarea'], ['img', 'Fotka', 'image'], ['sort', 'Poradie', 'number']] },
+  members:   { label: 'Crew', cols: ['img', 'name', 'instagram'], fields: [['name', 'Meno', 'text'], ['bio', 'Popis', 'textarea'], ['img', 'Fotka', 'image'], ['instagram', 'Instagram (https://www.instagram.com/…)', 'text'], ['sort', 'Poradie', 'number']] },
   playlists: { label: 'Hudba', cols: ['title', 'sub', 'spotify_id'], fields: [['title', 'Názov', 'text'], ['sub', 'Podtitul', 'text'], ['type', 'Typ', 'select', ['playlist', 'album', 'artist', 'track']], ['spotify_id', 'Spotify ID', 'text'], ['sort', 'Poradie', 'number']] },
   events:    { label: 'Eventy', cols: ['date', 'title', 'city'], fields: [['title', 'Názov', 'text'], ['date', 'Dátum', 'date'], ['venue', 'Miesto', 'text'], ['city', 'Mesto', 'text'], ['ticket_url', 'Odkaz na lístky', 'text']] },
   news:      { label: 'Novinky', cols: ['img', 'date', 'title'], fields: [['title', 'Titulok', 'text'], ['body', 'Text', 'textarea'], ['date', 'Dátum', 'date'], ['img', 'Obrázok', 'image']] },

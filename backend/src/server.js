@@ -31,6 +31,7 @@ const URL_HTTPS = /^https:\/\/[^\s"'<>\\]{1,2000}$/;
 const STRIPE_LINK = /^https:\/\/buy\.stripe\.com\/[A-Za-z0-9_]{6,100}$/;
 const SPOTIFY_ID = /^[A-Za-z0-9]{10,40}$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const INSTAGRAM = /^https:\/\/(www\.)?instagram\.com\/[A-Za-z0-9._]{1,30}\/?$/;
 
 // Per-column rules for admin writes: anything not listed in a resource is dropped, anything malformed is rejected.
 const text = max => v => v === null || (isStr(v) && v.length <= max) ? v : undefined;
@@ -44,7 +45,7 @@ const sizes = v => Array.isArray(v) && v.length <= 20 && v.every(s => isStr(s) &
 const required = rule => v => v === null || v === '' ? undefined : rule(v);
 
 const RESOURCES = {
-  members:   { order: 'sort', fields: { name: required(text(120)), bio: text(5000), img: url(URL_IMG), sort: int(0, 9999), published: bool } },
+  members:   { order: 'sort', fields: { name: required(text(120)), bio: text(5000), img: url(URL_IMG), instagram: url(INSTAGRAM), sort: int(0, 9999), published: bool } },
   playlists: { order: 'sort', fields: { title: required(text(200)), sub: text(200), type: oneOf(['playlist', 'album', 'artist', 'track']), spotify_id: required(url(SPOTIFY_ID)), sort: int(0, 9999), published: bool } },
   events:    { order: 'date', fields: { title: required(text(200)), date: required(date), venue: text(200), city: text(120), ticket_url: url(URL_HTTPS), sort: int(0, 9999), published: bool } },
   news:      { order: 'date', desc: true, fields: { title: required(text(200)), body: text(10000), date, img: url(URL_IMG), sort: int(0, 9999), published: bool } },

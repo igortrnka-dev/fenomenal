@@ -363,6 +363,15 @@ dialog.order::backdrop{background:rgba(10,10,10,.55)}
 .ship-later{font-size:14px;color:var(--gray-2);text-decoration:underline;text-underline-offset:3px}
 dialog.ship{width:min(640px,calc(100vw - 24px))}
 
+/* Instagram link on crew cards and in the bio dialog */
+.member-ig{display:inline-flex;align-items:center;gap:8px;width:fit-content;margin-top:16px;padding:7px 14px 7px 10px;border:1px solid rgba(255,255,255,.28);border-radius:99px;font-size:13px;font-weight:500;color:var(--white);transition:background .25s,color .25s,border-color .25s}
+.member-ig svg{width:18px;height:18px;flex:none}
+.member-ig:hover{background:var(--white);color:var(--ink);border-color:var(--white)}
+.member-ig:focus-visible{outline:1px dashed currentColor;outline-offset:3px}
+.bio .member-ig{margin-top:0;color:var(--ink);border-color:var(--line-l)}
+.bio .member-ig:hover{background:var(--ink);color:var(--white);border-color:var(--ink)}
+#bioIg:empty{display:none}
+
 /* very wide screens: keep content inside the 1920px grid */
 @media (min-width:1921px){
   :root{--in:calc((100vw - 1920px) / 2 + 96px)}

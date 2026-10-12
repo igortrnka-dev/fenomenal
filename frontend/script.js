@@ -221,6 +221,16 @@ const blurBg = src => /^img\/(komarko|mash1k|badman)\.jpg$/.test(src)
 
 /* ---------- Crew ---------- */
 // Bio: the card shows a faded preview, "Čítať viac" opens the full text with the photo
+// Instagram link: only real instagram.com profile URLs, shown as @handle
+const IG_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="17.4" cy="6.6" r="1.2" fill="currentColor"/></svg>';
+const igLink = (href, name) => {
+  let u;
+  try { u = new URL(href); } catch { return ''; }
+  const handle = u.pathname.split('/').filter(Boolean)[0] || '';
+  if (u.protocol !== 'https:' || !/^(www\.)?instagram\.com$/.test(u.hostname) || !/^[A-Za-z0-9._]{1,30}$/.test(handle)) return '';
+  const clean = `https://www.instagram.com/${handle}/`;
+  return `<a class="member-ig" href="${clean}" target="_blank" rel="noopener noreferrer" aria-label="Instagram – ${esc(name)} (otvorí sa v novom okne)">${IG_ICON}<span>@${handle}</span></a>`;
+};
 const bioBlock = text => `<div class="member-bio">${text.trim().split(/\n\s*\n/).map(p => `<p>${esc(p.trim())}</p>`).join('')}</div>`
   + '<button type="button" class="member-more">Čítať viac</button>';
 if (MEMBERS.length) { // members from the DB replace the static cards
@@ -229,7 +239,7 @@ if (MEMBERS.length) { // members from the DB replace the static cards
     <div class="member-bg">${blurBg(m.img)}</div>
     <div class="grid-lines four"><i></i><i></i><i></i><i></i><i></i></div>
     <div class="member-inner">
-      <div class="member-text"><small>Člen ${num(i)}</small><h3>${esc(m.name)}</h3>${m.bio ? bioBlock(m.bio) : ''}</div>
+      <div class="member-text"><small>Člen ${num(i)}</small><h3>${esc(m.name)}</h3>${m.instagram ? igLink(m.instagram, m.name) : ''}${m.bio ? bioBlock(m.bio) : ''}</div>
       <div class="member-pic">${img(m.img, `alt="${esc(m.name)}" data-st-scale="1.2,1" data-st-spring=".3,0,200,60"`)}</div>
       <div class="member-side"><span>Fenomenal</span><b>${num(i)}</b></div>
     </div>
@@ -243,6 +253,8 @@ $('#crewGrid').addEventListener('click', e => {
   $('#bioRole').textContent = $('.member-text small', card).textContent;
   $('#bioTitle').textContent = $('.member-text h3', card).textContent;
   $('#bioText').innerHTML = $('.member-bio', card).innerHTML;
+  const ig = $('.member-ig', card);
+  $('#bioIg').replaceChildren(...(ig ? [ig.cloneNode(true)] : []));
   const pic = $('.member-pic', card).cloneNode(true);
   pic.querySelectorAll('[data-st-scale]').forEach(el => { el.removeAttribute('data-st-scale'); el.style.transform = ''; });
   $('#bioPic').replaceChildren(...pic.childNodes);

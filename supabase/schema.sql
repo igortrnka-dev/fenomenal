@@ -1,7 +1,7 @@
 -- Spusti v Supabase → SQL Editor.
 -- Backend používa service_role key (obchádza RLS); RLS zapíname, aby anon key nemal prístup.
 
-create table if not exists members   (id bigint generated always as identity primary key, name text not null, bio text, img text, sort int default 0, published bool default true, created_at timestamptz default now());
+create table if not exists members   (id bigint generated always as identity primary key, name text not null, bio text, img text, instagram text, sort int default 0, published bool default true, created_at timestamptz default now());
 create table if not exists playlists (id bigint generated always as identity primary key, title text not null, sub text, type text default 'playlist', spotify_id text not null, sort int default 0, published bool default true, created_at timestamptz default now());
 create table if not exists events    (id bigint generated always as identity primary key, title text not null, date date not null, venue text, city text, ticket_url text, sort int default 0, published bool default true, created_at timestamptz default now());
 create table if not exists news      (id bigint generated always as identity primary key, title text not null, body text, date date default current_date, img text, sort int default 0, published bool default true, created_at timestamptz default now());
@@ -21,10 +21,10 @@ insert into storage.buckets (id, name, public) values ('media', 'media', true) o
 -- Seed (aktuálne dáta webu)
 insert into playlists (title, sub, type, spotify_id, sort) values
  ('FENOMENAL','Album','album','20yUeympd1xdHKamKavuJb',1);
-insert into members (name, bio, img, sort) values
- ('Komarko',null,'img/komarko.jpg',1),
- ('Mash1k',null,'img/mash1k.jpg',2),
- ('BADMAN',null,'img/badman.jpg',3);
+insert into members (name, bio, img, instagram, sort) values
+ ('Komarko',null,'img/komarko.jpg','https://www.instagram.com/komarko_official/',1),
+ ('Mash1k',null,'img/mash1k.jpg','https://www.instagram.com/mash_1k/',2),
+ ('BADMAN',null,'img/badman.jpg','https://www.instagram.com/bando.badman/',3);
 insert into products (name, sub, price, img, payment_link, sizes, sort) values
  ('FENOMENAL','Album na CD',15,'img/cd.png','https://buy.stripe.com/14AcN47dAcadb7p6kX2sM00','["CD"]',1);
 
