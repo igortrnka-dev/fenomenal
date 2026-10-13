@@ -128,6 +128,12 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .dark{background:var(--dark);color:var(--white)}
 .light{position:relative;background:transparent}
 .sec{position:relative}
+/* music: photo background, darkened so the text and player stay readable */
+.music-bg{position:absolute;inset:0;z-index:0;pointer-events:none}
+.music-bg img{width:100%;height:100%;object-fit:cover;object-position:50% 40%}
+.music-bg::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,10,10,.82),rgba(10,10,10,.6) 45%,rgba(10,10,10,.85))}
+#music>.grid-lines{z-index:1}
+#music>.sec-head,#music>.player{position:relative;z-index:1}
 .sec-head{position:relative;z-index:1;padding:100px 0 96px}
 .sec-head .label{padding:0 var(--in);margin-bottom:100px}
 .cols{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1fr;padding:0 var(--in);align-items:end}
