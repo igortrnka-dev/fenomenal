@@ -24,7 +24,7 @@ services:
       - key: ADMIN_SESSION_SECRET
         generateValue: true
       - key: CORS_ORIGINS
-        value: https://www.fenomenal.wtf,https://fenomenal.wtf,https://fenomenal-web.onrender.com,https://fenomenal-admin.onrender.com
+        value: https://www.fenomenal.wtf,https://fenomenal.wtf,https://fenomenal-web.onrender.com,https://fenomenal-admin.onrender.com,https://fenomenal-admin-tltz.onrender.com
       - key: SITE_URL
         value: https://www.fenomenal.wtf
       # Stripe: tajné hodnoty zadaj v Render dashboarde
