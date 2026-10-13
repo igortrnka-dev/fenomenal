@@ -36,7 +36,8 @@ a{color:inherit;text-decoration:none}
 .link{font-size:14px;color:var(--light-2);text-decoration:underline;text-underline-offset:3px}
 .link:hover{color:var(--white)}
 .err{min-height:20px;font-size:13px;font-weight:400;color:#c0392b}
-input,select,textarea{width:100%;height:44px;padding:0 14px;border:1px solid var(--line-l);border-radius:8px;background:var(--white);font:inherit;font-size:15px;font-weight:400;color:var(--ink);transition:border-color .2s}
+/* font-size 16px: anything smaller makes iOS Safari zoom the page when the field gets focus */
+input,select,textarea{width:100%;height:44px;padding:0 14px;border:1px solid var(--line-l);border-radius:8px;background:var(--white);font:inherit;font-size:16px;font-weight:400;color:var(--ink);transition:border-color .2s}
 textarea{height:auto;min-height:110px;padding:10px 14px;line-height:1.5;resize:vertical}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--ink)}
 /* Checkbox (Animate UI / shadcn look): rounded box fills in, the check mark draws itself from left to right */
@@ -56,7 +57,7 @@ input[type=file]{height:auto;padding:8px;font-size:13px}
 /* login */
 .login{position:relative;z-index:1;min-height:100vh;display:grid;place-items:center;padding:24px}
 .login-card{display:flex;flex-direction:column;gap:16px;width:min(420px,100%);padding:36px;border-radius:var(--radius);background:var(--white);box-shadow:0 20px 60px rgba(10,10,10,.08)}
-.login-card h1{font-size:40px;font-weight:600;letter-spacing:-.02em;line-height:1;margin-bottom:8px}
+.login-card h1{font-size:clamp(26px,8vw,40px);font-weight:600;letter-spacing:-.02em;line-height:1;margin-bottom:8px;overflow-wrap:anywhere}
 .login-card label{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--gray-2)}
 .login-card .btn{height:46px;margin-top:4px}
 
@@ -86,6 +87,10 @@ td.act{text-align:right;white-space:nowrap}
 td.act .btn{margin-left:6px}
 tr.off td:not(.act){opacity:.4}
 tr.off td:first-child::before{content:"Skryté";display:inline-block;margin-right:8px;padding:2px 8px;border-radius:99px;background:var(--light);font-size:11px;vertical-align:middle;opacity:1}
+/* tables wider than the screen scroll sideways; the action column stays pinned so Upraviť/Skryť/✕ are always visible */
+@media (min-width:701px){
+  #table td.act,#table th:last-child{position:sticky;right:0;background:var(--page);box-shadow:-12px 0 12px -12px rgba(10,10,10,.18)}
+}
 
 /* orders */
 td small{font-size:12px;font-weight:400;color:var(--gray)}

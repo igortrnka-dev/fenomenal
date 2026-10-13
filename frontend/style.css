@@ -402,6 +402,7 @@ dialog.checkout{width:min(680px,calc(100vw - 24px))}
   .cols{row-gap:24px}
   .sec-head{padding:72px 0 64px}
   .sec-head .label{margin-bottom:56px}
+  .hero{min-height:480px} /* 640px pushed the CTAs below the fold on 568px-tall phones */
   .hero-top{margin-top:110px;flex-direction:column}
   .hero-meta{gap:24px}
   .hero-list,.hero-meta{display:none}
@@ -471,3 +472,13 @@ dialog.checkout{width:min(680px,calc(100vw - 24px))}
 @media (prefers-reduced-motion: reduce) {
   [data-st-scale], [data-st-opacity], .hero-bg { animation: none !important }
 }
+
+/* Notched phones (viewport-fit=cover): keep content and edge UI clear of the notch and home indicator.
+   env() is 0 everywhere else, so these never change the layout on other devices. */
+.nav,.menu-inner,.hero-inner,.member-inner,.footer-inner,.sec-head .label,.cols,.player,.shop,.legal{
+  padding-left:max(var(--in),env(safe-area-inset-left));padding-right:max(var(--in),env(safe-area-inset-right))
+}
+.consent{left:max(12px,env(safe-area-inset-left));bottom:max(12px,env(safe-area-inset-bottom))}
+.toast{bottom:max(24px,env(safe-area-inset-bottom))}
+/* mobile browsers: 100vh includes the area under the address bar, 100dvh is what is actually visible */
+.hero{height:calc(100dvh - 12px)}
