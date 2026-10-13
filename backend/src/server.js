@@ -240,9 +240,11 @@ app.post('/api/order-request', limit('orderreq', 10, 10 * 60_000), noStore, wrap
   // a Payment Link cannot charge the shipping, so paid shipping needs the Stripe API key
   if (!stripe && Number(method.price) > 0) throw fail(503, 'Tento spôsob dopravy je dočasne nedostupný, vyber prosím iný.');
 
-  // Stored through a validated, throttled DB function (works with the public key; the orders table stays private)
+  // Stored through a validated, throttled DB function. Called with the service key (not anon) so that
+  // EXECUTE can be revoked from anon/authenticated — the RPC is then reachable only through this backend,
+  // which rate-limits per IP. The function still validates and throttles as defense in depth.
   const billing = { ...bill.a, company: company || undefined, email, phone };
-  const { data: reference, error } = await authClient.rpc('create_order_request', {
+  const { data: reference, error } = await db.rpc('create_order_request', {
     p: {
       email, phone, billing, note, product_id: product.id, shipping_method_id: method.id,
       shipping: packeta ? { name: bill.a.name, packeta_id: packeta.id, packeta_name: packeta.name, country: bill.a.country }
