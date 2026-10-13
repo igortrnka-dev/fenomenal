@@ -55,7 +55,9 @@ const RESOURCES = {
   events:    { order: 'date', fields: { title: required(text(200)), date: required(date), venue: text(200), city: text(120), ticket_url: url(URL_HTTPS), sort: int(0, 9999), published: bool } },
   news:      { order: 'date', desc: true, fields: { title: required(text(200)), body: text(10000), date, img: url(URL_IMG), sort: int(0, 9999), published: bool } },
   products:  { order: 'sort', fields: { name: required(text(120)), sub: text(200), price: num(0, 100000), img: url(URL_IMG), badge: text(40), sizes, payment_link: url(STRIPE_LINK), sort: int(0, 9999), published: bool } },
-  gallery:   { order: 'sort', fields: { src: required(url(URL_IMG)), cat: oneOf(['crew', 'street']), cap: text(120), sort: int(0, 9999), published: bool } }
+  gallery:   { order: 'sort', fields: { src: required(url(URL_IMG)), cat: oneOf(['crew', 'street']), cap: text(120), sort: int(0, 9999), published: bool } },
+  // orders come from the shop / Stripe; the admin only moves them through statuses (or deletes test ones)
+  orders:    { order: 'created_at', desc: true, noCreate: true, fields: { status: oneOf(['pending_payment', 'paid', 'shipped', 'done', 'cancelled']) } }
 };
 
 function validate(body, cfg) {
@@ -388,6 +390,7 @@ app.get('/api/admin/:res', resource, wrap(async (req, res) => {
   res.json(data);
 }));
 app.post('/api/admin/:res', resource, wrap(async (req, res) => {
+  if (req.cfg.noCreate) throw fail(405, 'Sem sa nedá pridávať');
   const { data, error } = await db.from(req.params.res).insert(validate(req.body, req.cfg)).select().single();
   if (error) throw error;
   res.status(201).json(data);

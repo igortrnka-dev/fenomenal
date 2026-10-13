@@ -9,9 +9,14 @@ const SCHEMA = {
   events:    { label: 'Eventy', cols: ['date', 'title', 'city'], fields: [['title', 'Názov', 'text'], ['date', 'Dátum', 'date'], ['venue', 'Miesto', 'text'], ['city', 'Mesto', 'text'], ['ticket_url', 'Odkaz na lístky', 'text']] },
   news:      { label: 'Novinky', cols: ['img', 'date', 'title'], fields: [['title', 'Titulok', 'text'], ['body', 'Text', 'textarea'], ['date', 'Dátum', 'date'], ['img', 'Obrázok', 'image']] },
   products:  { label: 'Shop', cols: ['img', 'name', 'sub', 'price'], fields: [['name', 'Názov', 'text'], ['sub', 'Podtitul', 'text'], ['price', 'Cena (€)', 'number'], ['img', 'Obrázok', 'image'], ['badge', 'Odznak', 'text'], ['sizes', 'Veľkosti (čiarkou)', 'sizes'], ['payment_link', 'Stripe platobný odkaz (záloha)', 'text'], ['sort', 'Poradie', 'number']] },
+  orders:    { label: 'Objednávky', orders: true },
   gallery:   { label: 'Galéria', cols: ['src', 'cap', 'cat'], fields: [['src', 'Obrázok', 'image'], ['cap', 'Popis', 'text'], ['cat', 'Kategória', 'select', ['crew', 'street']], ['sort', 'Poradie', 'number']] }
 };
 const IMG_COLS = new Set(['img', 'src']);
+const STATUS = { pending_payment: 'Čaká na platbu', paid: 'Zaplatená', shipped: 'Odoslaná', done: 'Vybavená', cancelled: 'Zrušená' };
+const eur = n => n == null ? '' : `${(+n).toLocaleString('sk-SK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+const when = d => new Date(d).toLocaleString('sk-SK', { day: 'numeric', month: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+const total = o => o.amount_total ?? (o.items || []).reduce((t, i) => t + (+i.price || 0) * (i.quantity || 1), 0);
 
 let token = sessionStorage.getItem('fen-token'), cur = 'members', rows = [], editing = null;
 
@@ -48,11 +53,13 @@ $('#tabs').onclick = e => { const k = e.target.dataset.k; if (k) select(k); };
 async function select(k) {
   cur = k; const s = SCHEMA[k];
   $('#title').textContent = s.label;
+  $('#addBtn').hidden = !!s.orders;
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.k === k));
   rows = await api(`/admin/${k}`); render();
 }
 function render() {
   const s = SCHEMA[cur];
+  if (s.orders) return renderOrders();
   const colLabel = c => (s.fields.find(f => f[0] === c) || [, c])[1].replace(/\s*\(.*\)$/, '');
   $('#table').innerHTML = `<tr>${s.cols.map(c => `<th>${esc(colLabel(c))}</th>`).join('')}<th></th></tr>` + rows.map(r => `
     <tr class="${r.published ? '' : 'off'}">${s.cols.map(c => `<td>${IMG_COLS.has(c) ? `<img src="${esc(imgSrc(r[c]))}" alt="">` : esc(r[c])}</td>`).join('')}
@@ -61,11 +68,37 @@ function render() {
 $('#table').onclick = async e => {
   const b = e.target.closest('button'); if (!b) return;
   const r = rows.find(x => x.id == b.dataset.id);
-  if (b.dataset.a === 'edit') openForm(r);
+  if (b.dataset.a === 'edit') (SCHEMA[cur].orders ? openOrder : openForm)(r);
   if (b.dataset.a === 'pub') { await api(`/admin/${cur}/${r.id}`, { method: 'PUT', body: JSON.stringify({ published: !r.published }) }); select(cur); }
   if (b.dataset.a === 'del' && confirm('Naozaj zmazať?')) { await api(`/admin/${cur}/${r.id}`, { method: 'DELETE' }); select(cur); }
 };
 $('#addBtn').onclick = () => openForm(null);
+
+/* ---------- orders ---------- */
+function renderOrders() {
+  $('#table').innerHTML = `<tr><th>Dátum</th><th>Číslo</th><th>Zákazník</th><th>Suma</th><th>Stav</th><th></th></tr>` + (rows.length ? rows.map(o => `
+    <tr class="${o.status === 'cancelled' ? 'void' : ''}"><td>${esc(when(o.created_at))}</td><td>${esc(o.reference || '—')}</td>
+    <td>${esc(o.name || o.billing?.name || '')}<br><small>${esc(o.email || '')}</small></td><td>${esc(eur(total(o)))}</td>
+    <td><span class="st st-${esc(o.status)}">${esc(STATUS[o.status] || o.status)}</span></td>
+    <td class="act"><button class="btn ghost" data-a="edit" data-id="${o.id}">Detail</button><button class="btn ghost danger" data-a="del" data-id="${o.id}" aria-label="Zmazať">✕</button></td></tr>`).join('')
+    : `<tr><td colspan="6" class="empty">Zatiaľ žiadne objednávky.</td></tr>`);
+}
+const addr = a => !a ? '—' : [a.name, a.company, a.street, [a.zip, a.city].filter(Boolean).join(' '), a.country, a.email, a.phone].filter(Boolean).map(esc).join('<br>');
+function openOrder(o) {
+  editing = o;
+  $('#form').innerHTML = `<p class="label"><i></i>Objednávka</p><h2 class="form-title">${esc(o.reference || `#${o.id}`)}</h2>
+    <p class="muted">${esc(when(o.created_at))}${o.stripe_session_id ? ' · Stripe' : ''}</p>
+    <div class="order-items">${(o.items || []).map(i => `<div><span>${i.quantity > 1 ? `${i.quantity}× ` : ''}${esc(i.name)}${i.size ? ` (${esc(i.size)})` : ''}</span><span>${esc(eur(i.price))}</span></div>`).join('')}
+      <div class="sum"><span>Spolu</span><span>${esc(eur(total(o)))}</span></div></div>
+    <div class="order-addr"><div><p class="label"><i></i>Fakturácia</p><p>${addr(o.billing || { name: o.name, email: o.email, phone: o.phone })}</p></div>
+      <div><p class="label"><i></i>Doručenie</p><p>${addr(o.shipping)}</p></div></div>
+    ${o.note ? `<div><p class="label"><i></i>Poznámka</p><p>${esc(o.note)}</p></div>` : ''}
+    <label>Stav<select name="status">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${k === o.status ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+    <p id="formErr" class="err"></p>
+    <div class="row"><button type="button" class="btn ghost" id="cancel">Zavrieť</button><button class="btn" id="save">Uložiť stav</button></div>`;
+  $('#dlg').showModal();
+  $('#cancel').onclick = () => $('#dlg').close();
+}
 
 /* ---------- form ---------- */
 function openForm(r) {
@@ -95,6 +128,13 @@ $('#form').addEventListener('change', async e => {
 });
 $('#form').onsubmit = async e => {
   e.preventDefault();
+  if (SCHEMA[cur].orders) {
+    try {
+      await api(`/admin/orders/${editing.id}`, { method: 'PUT', body: JSON.stringify({ status: $('#form').elements.status.value }) });
+      $('#dlg').close(); select(cur);
+    } catch (err) { $('#formErr').textContent = err.message; }
+    return;
+  }
   const s = SCHEMA[cur], body = { published: $('#form').elements.published.checked };
   for (const [k, , type] of s.fields) {
     let v = $('#form').elements[k].value;
