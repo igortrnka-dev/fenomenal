@@ -8,7 +8,8 @@ import Stripe from 'stripe';
 const {
   SUPABASE_URL, SUPABASE_SERVICE_KEY, SUPABASE_ANON_KEY,
   ADMIN_KEY_HASHES = '', ADMIN_SESSION_SECRET = '', CORS_ORIGINS = '', PORT = 3000,
-  STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, SITE_URL = 'http://localhost:5173'
+  STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, SITE_URL = 'http://localhost:5173',
+  RESEND_API_KEY, MAIL_FROM = 'FENOMENAL <objednavky@fenomenal.wtf>', MAIL_REPLY_TO
 } = process.env;
 const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
 
@@ -57,7 +58,8 @@ const RESOURCES = {
   products:  { order: 'sort', fields: { name: required(text(120)), sub: text(200), price: num(0, 100000), img: url(URL_IMG), badge: text(40), sizes, payment_link: url(STRIPE_LINK), sort: int(0, 9999), published: bool } },
   gallery:   { order: 'sort', fields: { src: required(url(URL_IMG)), cat: oneOf(['crew', 'street']), cap: text(120), sort: int(0, 9999), published: bool } },
   // orders come from the shop / Stripe; the admin only moves them through statuses (or deletes test ones)
-  orders:    { order: 'created_at', desc: true, noCreate: true, fields: { status: oneOf(['pending_payment', 'paid', 'shipped', 'done', 'cancelled']) } }
+  shipping_methods: { order: 'sort', fields: { name: required(text(120)), description: text(200), price: num(0, 1000), kind: oneOf(['pickup', 'address', 'packeta']), sort: int(0, 9999), published: bool } },
+  orders:    { order: 'created_at', desc: true, noCreate: true, adminOnly: true, fields: { status: oneOf(['pending_payment', 'paid', 'shipped', 'done', 'cancelled']) } }
 };
 
 function validate(body, cfg) {
@@ -118,7 +120,8 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json', limit: '
   try {
     if (['checkout.session.completed', 'checkout.session.async_payment_succeeded'].includes(event.type)) {
       const s = event.data.object;
-      if (s.payment_status === 'paid') {
+      if (s.payment_status === 'paid' && REF_RE.test(s.client_reference_id || '')) await finalizeOrder(s);
+      else if (s.payment_status === 'paid') {
         const { data: lines } = await stripe.checkout.sessions.listLineItems(s.id, { limit: 100 });
         const { data: existing } = await db.from('orders').select('shipping').eq('stripe_session_id', s.id).maybeSingle();
         const row = {
@@ -181,6 +184,7 @@ app.get('/health', async (_, res) => {
 /* ---------- Public ---------- */
 // Read with the anon key: RLS only exposes published rows, so public pages never need the service_role key
 app.get('/api/:res', limit('public', 300, 60_000), resource, wrap(async (req, res) => {
+  if (req.cfg.adminOnly) throw fail(404, 'Nenájdené');
   const { data, error } = await authClient.from(req.params.res).select('*')
     .eq('published', true).order(req.cfg.order, { ascending: !req.cfg.desc });
   if (error) throw error;
@@ -213,7 +217,17 @@ app.post('/api/order-request', limit('orderreq', 10, 10 * 60_000), noStore, wrap
   const missing = [...bill.missing];
   if (!EMAIL.test(email)) missing.push('email');
   if (!/^\+?\d{6,15}$/.test(phone)) missing.push('phone');
-  const ship = b.ship_different === true ? address(b, 'ship_') : null;
+  const methodId = Number(b.shipping_method_id);
+  const { data: method, error: mErr } = Number.isSafeInteger(methodId) && methodId > 0
+    ? await authClient.from('shipping_methods').select('id, name, price, kind').eq('id', methodId).eq('published', true).maybeSingle()
+    : { data: null };
+  if (mErr) throw mErr;
+  if (!method) missing.push('shipping_method_id');
+  // Packeta: the pickup point chosen in the Packeta widget; pickup: no delivery address needed
+  const packeta = method?.kind === 'packeta'
+    ? { id: clean(String(b.packeta_id ?? ''), 12), name: clean(b.packeta_name, 300) } : null;
+  if (packeta && (!/^\d{1,12}$/.test(packeta.id) || !packeta.name)) missing.push('packeta_id');
+  const ship = method?.kind === 'address' && b.ship_different === true ? address(b, 'ship_') : null;
   if (ship) missing.push(...ship.missing);
   if (b.terms !== true) missing.push('terms');
   if (missing.length) throw fail(400, 'Skontroluj prosím zvýraznené údaje', { fields: [...new Set(missing)] });
@@ -223,11 +237,17 @@ app.post('/api/order-request', limit('orderreq', 10, 10 * 60_000), noStore, wrap
   const { data: product, error: pErr } = await authClient.from('products').select('id, name, sub, price, payment_link').eq('id', productId).maybeSingle();
   if (pErr) throw pErr;
   if (!product || !STRIPE_LINK.test(product.payment_link || '')) throw fail(400, 'Tento produkt sa momentálne nedá objednať');
+  // a Payment Link cannot charge the shipping, so paid shipping needs the Stripe API key
+  if (!stripe && Number(method.price) > 0) throw fail(503, 'Tento spôsob dopravy je dočasne nedostupný, vyber prosím iný.');
 
   // Stored through a validated, throttled DB function (works with the public key; the orders table stays private)
   const billing = { ...bill.a, company: company || undefined, email, phone };
   const { data: reference, error } = await authClient.rpc('create_order_request', {
-    p: { email, phone, billing, shipping: ship ? ship.a : bill.a, note, product_id: product.id }
+    p: {
+      email, phone, billing, note, product_id: product.id, shipping_method_id: method.id,
+      shipping: packeta ? { name: bill.a.name, packeta_id: packeta.id, packeta_name: packeta.name, country: bill.a.country }
+        : method.kind === 'pickup' ? { name: bill.a.name, pickup: true } : ship ? ship.a : bill.a
+    }
   });
   if (error) {
     if (/rate_limited/.test(error.message)) throw fail(429, 'Príliš veľa objednávok naraz, skús to prosím neskôr.');
@@ -235,6 +255,25 @@ app.post('/api/order-request', limit('orderreq', 10, 10 * 60_000), noStore, wrap
     throw error;
   }
 
+  if (stripe) {
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      locale: 'sk',
+      client_reference_id: reference,
+      customer_email: email,
+      line_items: [{ quantity: 1, adjustable_quantity: { enabled: true, minimum: 1, maximum: 10 }, price_data: {
+        currency: 'eur', unit_amount: Math.round(Number(product.price) * 100),
+        product_data: { name: product.sub ? `${product.name} — ${product.sub}` : product.name }
+      } }],
+      shipping_options: [{ shipping_rate_data: {
+        type: 'fixed_amount', display_name: method.name, fixed_amount: { amount: Math.round(Number(method.price) * 100), currency: 'eur' }
+      } }],
+      success_url: `${SITE_URL}/?order=success&session_id={CHECKOUT_SESSION_ID}#shop`,
+      cancel_url: `${SITE_URL}/?order=cancel#shop`
+    });
+    return res.json({ reference, url: session.url });
+  }
+  // without a Stripe key: the product's Payment Link (its "after payment" redirect is set in Stripe)
   const url = new URL(product.payment_link);
   url.searchParams.set('client_reference_id', reference);
   url.searchParams.set('prefilled_email', email);
@@ -279,6 +318,78 @@ app.post('/api/checkout', limit('checkout', 20, 10 * 60_000), noStore, wrap(asyn
   res.json({ url: session.url });
 }));
 
+/* ---------- Paid order: status + thank-you e-mail ---------- */
+const REF_RE = /^FEN-[0-9A-F]{8}$/;
+const escHtml = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const eur = n => `${Number(n || 0).toFixed(2).replace('.', ',')} €`;
+
+function thankYouMail(o) {
+  const a = o.shipping || {};
+  const items = o.items || [];
+  const sm = o.shipping_method;
+  const addr = a.packeta_id ? [a.name, `Packeta – ${a.packeta_name}`]
+    : a.pickup ? ['Osobný odber v Bratislave – ozveme sa ti a dohodneme sa.']
+    : [a.name, a.street, [a.zip, a.city].filter(Boolean).join(' '), a.country === 'CZ' ? 'Česko' : 'Slovensko'].filter(Boolean);
+  const rows = items.map(i => `<tr><td style="padding:10px 0;border-bottom:1px dashed #ddd">${i.qty > 1 ? `${i.qty}× ` : ''}${escHtml(i.name)}</td><td style="padding:10px 0;border-bottom:1px dashed #ddd;text-align:right;white-space:nowrap">${eur(i.amount ?? i.price)}</td></tr>`).join('');
+  const html = `<!doctype html><html lang="sk"><body style="margin:0;background:#f2f2f2;font-family:Helvetica,Arial,sans-serif;color:#0a0a0a">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f2f2f2;padding:24px 12px"><tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px">
+<tr><td style="background:#0a0a0a;color:#fff;border-radius:20px 20px 0 0;padding:32px">
+  <div style="font-size:20px;font-weight:600;letter-spacing:.02em">FENOMENAL®</div>
+  <div style="margin-top:28px;font-size:13px;color:#999">Objednávka ${escHtml(o.reference)}</div>
+  <div style="margin-top:8px;font-size:32px;line-height:1.05;font-weight:700;text-transform:uppercase">Ďakujeme za nákup!</div>
+</td></tr>
+<tr><td style="background:#fff;border-radius:0 0 20px 20px;padding:32px;font-size:15px;line-height:1.55">
+  <p style="margin:0 0 16px">Ahoj${a.name ? ' ' + escHtml(a.name.split(' ')[0]) : ''},</p>
+  <p style="margin:0 0 16px">platba prebehla úspešne a tvoja objednávka je u nás. Vďaka, že podporuješ slovenskú scénu – bez vás by to nešlo.</p>
+  <p style="margin:0 0 24px">${a.pickup ? 'Ozveme sa ti a dohodneme odovzdanie.' : 'CD ti zabalíme a pošleme na adresu nižšie.'} Keby niečo nesedelo, stačí odpovedať na tento e-mail.</p>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:15px">${rows}
+    ${sm ? `<tr><td style="padding:10px 0;border-bottom:1px dashed #ddd">Doprava: ${escHtml(sm.name)}</td><td style="padding:10px 0;border-bottom:1px dashed #ddd;text-align:right;white-space:nowrap">${eur(sm.price)}</td></tr>` : ''}
+    <tr><td style="padding:12px 0;font-weight:700">Spolu</td><td style="padding:12px 0;text-align:right;font-weight:700">${eur(o.amount_total)}</td></tr></table>
+  <div style="margin-top:24px;font-size:13px;color:#808080">${a.pickup ? 'Prevzatie' : 'Doručíme na'}</div>
+  <div style="margin-top:6px">${addr.map(escHtml).join('<br>')}</div>
+  <p style="margin:32px 0 0">Ďakujeme,<br><b>FENOMENAL crew</b></p>
+</td></tr>
+<tr><td style="padding:20px 8px;font-size:12px;color:#999;text-align:center"><a href="${escHtml(SITE_URL)}" style="color:#999">${escHtml(SITE_URL.replace(/^https?:\/\//, ''))}</a></td></tr>
+</table></td></tr></table></body></html>`;
+  const text = [`Ďakujeme za nákup! Objednávka ${o.reference}`, '', 'Platba prebehla úspešne a tvoja objednávka je u nás.',
+    'Keby niečo nesedelo, stačí odpovedať na tento e-mail.', '', ...items.map(i => `${i.qty > 1 ? `${i.qty}× ` : ''}${i.name} – ${eur(i.amount ?? i.price)}`),
+    ...(sm ? [`Doprava: ${sm.name} – ${eur(sm.price)}`] : []), `Spolu: ${eur(o.amount_total)}`, '', a.pickup ? 'Prevzatie:' : 'Doručíme na:', ...addr, '', 'Ďakujeme,', 'FENOMENAL crew', SITE_URL].join('\n');
+  return { subject: `Ďakujeme za nákup – objednávka ${o.reference}`, html, text };
+}
+
+async function sendMail(to, { subject, html, text }, idempotencyKey) {
+  const r = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey },
+    body: JSON.stringify({ from: MAIL_FROM, to: [to], subject, html, text, ...(MAIL_REPLY_TO && { reply_to: MAIL_REPLY_TO }) }),
+    signal: AbortSignal.timeout(15000)
+  });
+  if (!r.ok) throw new Error(`Resend ${r.status}: ${(await r.text()).slice(0, 300)}`);
+}
+
+// Called from the webhook and from the customer's return to the site; safe to run any number of times.
+async function finalizeOrder(s) {
+  const ref = s.client_reference_id;
+  const { data: lines } = await stripe.checkout.sessions.listLineItems(s.id, { limit: 100 });
+  const { error } = await db.from('orders').update({
+    status: 'paid', stripe_session_id: s.id, amount_total: s.amount_total / 100, currency: s.currency,
+    items: lines.map(l => ({ name: l.description, qty: l.quantity, amount: l.amount_total / 100 }))
+  }).eq('reference', ref).eq('status', 'pending_payment');
+  if (error) throw error;
+  if (!RESEND_API_KEY) return;
+  // claim the e-mail first, so parallel calls never send it twice
+  const { data: claimed, error: cErr } = await db.from('orders').update({ confirmation_sent_at: new Date().toISOString() })
+    .eq('reference', ref).is('confirmation_sent_at', null).select('*').maybeSingle();
+  if (cErr) throw cErr;
+  if (!claimed?.email) return;
+  try { await sendMail(claimed.email, thankYouMail(claimed), `order-${ref}`); }
+  catch (e) {
+    await db.from('orders').update({ confirmation_sent_at: null }).eq('reference', ref);
+    console.error('Mail:', e.message);
+  }
+}
+
 /* ---------- Shipping details after payment ---------- */
 // The customer comes back from Stripe with ?session_id=… — we verify the payment with Stripe
 // before showing or saving anything, so only paid, recent orders can read or submit an address.
@@ -304,6 +415,10 @@ const fromStripe = s => {
 
 app.get('/api/order/:session', limit('order', 30, 10 * 60_000), noStore, wrap(async (req, res) => {
   const s = await paidSession(req.params.session);
+  if (REF_RE.test(s.client_reference_id || '')) {
+    await finalizeOrder(s).catch(e => console.error('Finalize:', e.message));
+    return res.json({ reference: s.client_reference_id, email: s.customer_details?.email || '', amount: s.amount_total / 100, currency: s.currency });
+  }
   const { data: saved } = await db.from('orders').select('shipping').eq('stripe_session_id', s.id).maybeSingle();
   res.json({
     email: s.customer_details?.email || '',

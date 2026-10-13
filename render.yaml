@@ -32,6 +32,11 @@ services:
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
+      # Ďakovný e-mail po platbe (resend.com → API Keys; doména fenomenal.wtf musí byť overená)
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        value: FENOMENAL <objednavky@fenomenal.wtf>
 
   - type: web
     name: fenomenal-web
@@ -43,7 +48,7 @@ services:
       # Only our own scripts; network only to our API, Spotify embed and Supabase images
       - path: /*
         name: Content-Security-Policy
-        value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co; font-src 'self'; connect-src 'self' https://fenomenal-api.onrender.com; frame-src https://open.spotify.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+        value: "default-src 'self'; script-src 'self' https://widget.packeta.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co; font-src 'self'; connect-src 'self' https://fenomenal-api.onrender.com; frame-src https://open.spotify.com https://widget.packeta.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
       - path: /*
         name: Strict-Transport-Security
         value: max-age=63072000; includeSubDomains

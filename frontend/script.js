@@ -1,8 +1,7 @@
 'use strict';
 import {
-  springEasing, EASE_IN_OUT, appear, charsAppear, refresh, initParallax, startLoop, reduced
+  springEasing, EASE_IN_OUT, appear, charsAppear, refresh, reduced
 } from './motion.js';
-import { createCrosshair } from './crosshair.js';
 import { initConsent, hasConsent, setConsent, onConsentChange } from './consent.js';
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -54,7 +53,6 @@ if (reduced) {
 $$('[data-appear]').forEach(el => appear(el, { delay: +el.dataset.appear }));
 appear($('#heroBg'), { y: 24, duration: 6, from: 1 });
 $$('.hero .plus.rot').forEach(p => appear(p, { delay: 2.6, y: 0, rotate: -90, from: 1 }));
-initParallax([{ el: $('#heroBg'), speed: 0.8 }]);
 
 // Mobile: looping video background (loaded only when the mobile layout is active)
 {
@@ -78,7 +76,7 @@ initParallax([{ el: $('#heroBg'), speed: 0.8 }]);
 if (!reduced) {
   const box = $('#heroGlitch'), hero = $('#hero');
   const SHOTS = ['img/glitch-1', 'img/glitch-2'];
-  const MAIN = { base: 'img/hero-blur', avif: false, pos: '50% 4%', baked: true }; // matches the visible blurred layer
+  const MAIN = { base: 'img/hero-1200', pos: '50% 4%' }; // matches the visible hero photo
   const layer = cls => {
     const d = document.createElement('div');
     d.className = cls;
@@ -91,7 +89,6 @@ if (!reduced) {
     d.querySelector('source').srcset = shot.avif === false ? '' : shot.base + '.avif';
     const im = d.querySelector('img');
     im.src = shot.base + '.jpg';
-    d.classList.toggle('baked', !!shot.baked);
     d.style.setProperty('--gpos', shot.pos || '50% 15%');
     return im;
   };
@@ -132,36 +129,6 @@ if (!reduced) {
     setTimeout(cycle, rnd(3500, 6000));
   };
   setTimeout(cycle, 6000); // after the preloader and hero entrance
-}
-
-// Focus spotlight: the photo sharpens in a soft circle that trails the cursor
-{
-  const hero = $('#hero'), focus = $('#heroFocus'), RADIUS = 260;
-  const cur = { x: 0, y: 0, r: 0 }, target = { x: 0, y: 0, r: 0 };
-  let running = false, primed = false;
-  const step = () => {
-    // critically-damped-ish follow: position trails a little, radius eases in/out
-    cur.x += (target.x - cur.x) * 0.16;
-    cur.y += (target.y - cur.y) * 0.16;
-    cur.r += (target.r - cur.r) * 0.12;
-    focus.style.setProperty('--fx', cur.x.toFixed(1) + 'px');
-    focus.style.setProperty('--fy', cur.y.toFixed(1) + 'px');
-    focus.style.setProperty('--fr', cur.r.toFixed(1) + 'px');
-    const settled = Math.abs(target.x - cur.x) < 0.3 && Math.abs(target.y - cur.y) < 0.3 && Math.abs(target.r - cur.r) < 0.3;
-    running = !settled;
-    if (running) requestAnimationFrame(step);
-  };
-  const kick = () => { if (!running) { running = true; requestAnimationFrame(step); } };
-  hero.addEventListener('pointermove', e => {
-    if (e.pointerType !== 'mouse') return;
-    const r = focus.getBoundingClientRect();
-    target.x = e.clientX - r.left;
-    target.y = e.clientY - r.top;
-    target.r = RADIUS;
-    if (!primed) { cur.x = target.x; cur.y = target.y; primed = true; } // grow from the cursor, don't slide in from a corner
-    kick();
-  });
-  hero.addEventListener('pointerleave', () => { target.r = 0; primed = false; kick(); });
 }
 
 /* ---------- Nav: hide on scroll down, theme follows the section underneath ---------- */
@@ -210,7 +177,6 @@ let PRODUCTS = [
 ];
 let MEMBERS = [];
 
-startLoop();
 refresh();
 
 const API = (window.FEN_CONFIG && window.FEN_CONFIG.API_URL) || '';
@@ -323,10 +289,23 @@ const spIO = new IntersectionObserver(entries => {
   if (spNear && hasConsent('media')) { spIO.disconnect(); activateSpotify(); }
 }, { rootMargin: '150% 0px' });
 spIO.observe($('.player-embed'));
+// With consent, warm up the Spotify connections early and load the player as soon as the page is idle,
+// so it is ready before the visitor reaches the music section.
+const spWarm = () => {
+  if (spWarm.done || !hasConsent('media')) return;
+  spWarm.done = true;
+  ['https://open.spotify.com', 'https://embed-cdn.spotifycdn.com', 'https://i.scdn.co'].forEach(href =>
+    document.head.append(Object.assign(document.createElement('link'), { rel: 'preconnect', href, crossOrigin: '' })));
+  const go = () => { spIO.disconnect(); activateSpotify(); };
+  const idle = () => ('requestIdleCallback' in window ? requestIdleCallback(go, { timeout: 2500 }) : setTimeout(go, 1200));
+  if (document.readyState === 'complete') idle(); else addEventListener('load', idle, { once: true });
+};
+spWarm();
 onConsentChange(() => {
   if (!hasConsent('media') && frame) { frame.replaceWith(facade); frame = null; } // consent withdrawn → drop the embed
   updateSpHint();
   if (hasConsent('media') && spNear) activateSpotify();
+  spWarm();
 });
 function loadPlaylist(i) {
   const p = PLAYLISTS[i];
@@ -353,7 +332,7 @@ loadPlaylist(0);
    product's Stripe Payment Link with our order number (client_reference_id) and the e-mail prefilled. */
 ['fen-cart', 'fen-pending-order'].forEach(k => { try { localStorage.removeItem(k); } catch { /* storage blocked */ } }); // leftovers of the old checkout
 // Only real Stripe payment links (no javascript:, no look-alike domains)
-const isStripeLink = u => { try { const x = new URL(u); return x.origin === 'https://buy.stripe.com' && !x.username && !x.password; } catch { return false; } };
+const isStripeLink = u => { try { const x = new URL(u); return ['https://buy.stripe.com', 'https://checkout.stripe.com'].includes(x.origin) && !x.username && !x.password; } catch { return false; } };
 const fmt = n => `${String(n).replace('.', ',')} €`;
 const toast = (msg, ms = 2000) => {
   const t = $('#toast'); t.textContent = msg; t.classList.add('show');
@@ -377,17 +356,69 @@ const coDlg = $('#checkoutDlg'), coForm = $('#coForm');
 const coErr = msg => { $('#coError').textContent = msg || ''; };
 const CO_LABELS = { name: 'meno', email: 'e-mail', phone: 'telefón', street: 'ulica', zip: 'PSČ', city: 'mesto', country: 'krajina',
   ship_name: 'meno príjemcu', ship_street: 'doručovacia ulica', ship_zip: 'doručovacie PSČ', ship_city: 'doručovacie mesto', ship_country: 'doručovacia krajina',
-  terms: 'súhlas so zásadami' };
+  terms: 'súhlas so zásadami', shipping_method_id: 'spôsob dopravy', packeta_id: 'výdajné miesto Packeta' };
 // mark the bad fields, name them in the message and bring the first one into view
 function coInvalid(keys, prefix) {
   const f = coForm.elements;
-  keys.forEach(k => f[k]?.classList.add('invalid'));
+  keys.forEach(k => {
+    if (k === 'shipping_method_id') $('#coMethods').classList.add('invalid');
+    else if (k === 'packeta_id') $('#coPick').classList.add('invalid');
+    else f[k]?.classList?.add('invalid');
+  });
   const names = [...new Set(keys)].map(k => CO_LABELS[k] || k);
   coErr(`${prefix}: ${names.join(', ')}.`);
-  const first = f[keys[0]];
-  if (first) { first.scrollIntoView({ block: 'center', behavior: 'smooth' }); first.focus({ preventScroll: true }); }
+  const first = keys[0] === 'shipping_method_id' ? $('#coMethods') : keys[0] === 'packeta_id' ? $('#coPick') : f[keys[0]];
+  if (first?.scrollIntoView) { first.scrollIntoView({ block: 'center', behavior: 'smooth' }); first.focus({ preventScroll: true }); }
 }
 coForm.addEventListener('input', e => { e.target.classList?.remove('invalid'); });
+
+/* Shipping: methods and prices come from the admin (shipping_methods); Packeta needs its widget key */
+const PACKETA_KEY = window.FEN_CONFIG?.PACKETA_API_KEY || '';
+let SHIP_METHODS = null;
+const eur2 = n => `${Number(n).toFixed(2).replace('.', ',')} €`;
+const coMethod = () => SHIP_METHODS?.find(m => String(m.id) === coForm.elements.shipping_method_id?.value);
+async function loadShipping() {
+  if (SHIP_METHODS) return;
+  const box = $('#coMethods');
+  try {
+    const r = await fetch(`${API}/api/shipping_methods`, { signal: AbortSignal.timeout(45000) });
+    if (!r.ok) throw new Error();
+    SHIP_METHODS = (await r.json()).filter(m => m.kind !== 'packeta' || PACKETA_KEY);
+  } catch {
+    box.innerHTML = '<p class="co-sub">Možnosti dopravy sa nepodarilo načítať. Skús to prosím o chvíľu znova.</p>';
+    return;
+  }
+  box.innerHTML = SHIP_METHODS.map(m => `<label class="co-method"><input type="radio" name="shipping_method_id" value="${Number(m.id)}">
+    <span>${esc(m.name)}${m.description ? `<small>${esc(m.description)}</small>` : ''}</span><em>${+m.price ? eur2(m.price) : 'Zadarmo'}</em></label>`).join('');
+  if (SHIP_METHODS.length === 1) box.querySelector('input').checked = true;
+  updateShipping();
+}
+function updateShipping() {
+  const m = coMethod();
+  $('#coMethods').classList.remove('invalid');
+  $('#coPacketa').hidden = m?.kind !== 'packeta';
+  $('#coShipToggle').hidden = m?.kind !== 'address';
+  if (m?.kind !== 'address') { coForm.elements.ship_different.checked = false; $('#coShip').hidden = true; }
+  const price = coProduct ? Number(coProduct.price) : 0;
+  $('#coTotal').innerHTML = m ? `CD ${eur2(price)} + doprava ${+m.price ? eur2(m.price) : 'zadarmo'} = <b>${eur2(price + Number(m.price))}</b> pri 1 ks` : '';
+}
+coForm.addEventListener('change', e => { if (e.target.name === 'shipping_method_id') updateShipping(); });
+// Packeta widget: its script loads only when the customer actually picks a point
+let packetaLib = null;
+$('#coPick').addEventListener('click', async () => {
+  const btn = $('#coPick'); btn.classList.remove('invalid');
+  packetaLib ||= new Promise((ok, ko) => document.head.append(Object.assign(document.createElement('script'),
+    { src: 'https://widget.packeta.com/v6/www/js/library.js', onload: ok, onerror: () => { packetaLib = null; ko(); } })));
+  try { await packetaLib; } catch { coErr('Mapu výdajných miest sa nepodarilo načítať.'); return; }
+  window.Packeta.Widget.pick(PACKETA_KEY, point => {
+    if (!point) return;
+    const label = [point.name, point.formatedValue || [point.street, point.zip, point.city].filter(Boolean).join(', ')].filter(Boolean).join(' – ');
+    coForm.elements.packeta_id.value = point.id;
+    coForm.elements.packeta_name.value = label.slice(0, 300);
+    $('#coPoint').textContent = label;
+    btn.textContent = 'Zmeniť výdajné miesto';
+  }, { country: 'sk,cz', language: 'sk' });
+});
 let coProduct = null;
 $('#shopGrid').addEventListener('click', e => {
   if (!e.target.closest('.order-btn')) return;
@@ -398,6 +429,7 @@ $('#shopGrid').addEventListener('click', e => {
   coForm.querySelectorAll('.invalid').forEach(el => el.classList.remove('invalid'));
   coDlg.showModal();
   coDlg.scrollTop = 0;
+  loadShipping().then(updateShipping);
   appear($('.co-card', coDlg), { y: 24, duration: 0.8 });
 });
 coForm.elements.ship_different.addEventListener('change', e => { $('#coShip').hidden = !e.target.checked; });
@@ -407,12 +439,14 @@ coForm.addEventListener('submit', async e => {
   e.preventDefault();
   coForm.querySelectorAll('.invalid').forEach(el => el.classList.remove('invalid'));
   const f = coForm.elements, data = {};
-  for (const el of f) if (el.name) data[el.name] = el.type === 'checkbox' ? el.checked : el.value;
+  for (const el of f) if (el.name && (el.type !== 'radio' || el.checked)) data[el.name] = el.type === 'checkbox' ? el.checked : el.value;
   if (!data.ship_different) for (const k of Object.keys(data)) if (k.startsWith('ship_') && k !== 'ship_different') delete data[k];
   data.product_id = coProduct.id;
   // quick client-side check (the server validates again)
   const req = ['name', 'email', 'phone', 'street', 'zip', 'city', ...(data.ship_different ? ['ship_name', 'ship_street', 'ship_zip', 'ship_city'] : [])];
   const empty = req.filter(k => !String(data[k] || '').trim());
+  if (!coMethod()) empty.push('shipping_method_id');
+  else if (coMethod().kind === 'packeta' && !data.packeta_id) empty.push('packeta_id');
   if (!data.terms) empty.push('terms');
   if (empty.length) return coInvalid(empty, 'Doplň prosím');
   const btn = $('#coSubmit'); btn.disabled = true; coErr('Ukladám objednávku…');
@@ -435,12 +469,28 @@ coForm.addEventListener('submit', async e => {
   }
 });
 
-// Back from Stripe (Payment Link → "After payment" redirect to /?order=success)
+// Back from Stripe after payment: thank-you dialog; the API confirms the payment and sends the e-mail
 {
-  const q = new URLSearchParams(location.search);
+  const q = new URLSearchParams(location.search), sid = q.get('session_id');
   if (q.get('order') === 'success') {
     let ref = ''; try { ref = sessionStorage.getItem('fen-last-order') || ''; sessionStorage.removeItem('fen-last-order'); } catch { /* ignore */ }
-    toast(`Ďakujeme za objednávku${ref ? ' ' + ref : ''}! Potvrdenie ti príde e-mailom a CD čoskoro posielame.`, 8000);
+    const dlg = $('#thanksDlg'), close = () => dlg.close();
+    const fill = (r, email) => {
+      if (r) $('#thanksRef').textContent = `Objednávka ${r}`;
+      const t = $('#thanksText');
+      t.textContent = 'Platba prebehla úspešne. ';
+      if (email) { t.append('Potvrdenie sme poslali na '); t.append(Object.assign(document.createElement('b'), { textContent: email })); t.append('. '); }
+      t.append('CD ti zabalíme a čoskoro pošleme.');
+    };
+    fill(ref, '');
+    $('#thanksClose').onclick = $('#thanksOk').onclick = close;
+    dlg.addEventListener('click', e => { if (e.target === dlg) close(); });
+    dlg.showModal();
+    appear($('.thanks-card', dlg), { y: 24, duration: 0.8 });
+    if (/^cs_(test|live)_[A-Za-z0-9]{10,200}$/.test(sid || '')) {
+      fetch(`${API}/api/order/${encodeURIComponent(sid)}`, { signal: AbortSignal.timeout(45000) })
+        .then(r => r.ok ? r.json() : null).then(d => d && fill(d.reference || ref, d.email)).catch(() => {});
+    }
   }
   if (q.has('order') || q.has('session_id')) history.replaceState(null, '', location.pathname + location.hash);
 }
@@ -448,11 +498,6 @@ coForm.addEventListener('submit', async e => {
 addEventListener('keydown', e => {
   if (e.key === 'Escape') setMenu(false);
 });
-
-// Crosshair cursor (React Bits) — only for real mouse pointers; difference blend keeps it visible on light and dark sections
-if (matchMedia('(pointer: fine)').matches) {
-  createCrosshair({ color: '#ffffff', blendMode: 'difference', targetEffect: 'lock', thickness: 1, opacity: 0.85, smoothing: 0.35, showCoordinates: true });
-}
 
 initConsent();
 

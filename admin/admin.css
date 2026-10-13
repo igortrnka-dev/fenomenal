@@ -39,7 +39,18 @@ a{color:inherit;text-decoration:none}
 input,select,textarea{width:100%;height:44px;padding:0 14px;border:1px solid var(--line-l);border-radius:8px;background:var(--white);font:inherit;font-size:15px;font-weight:400;color:var(--ink);transition:border-color .2s}
 textarea{height:auto;min-height:110px;padding:10px 14px;line-height:1.5;resize:vertical}
 input:focus,select:focus,textarea:focus{outline:none;border-color:var(--ink)}
-input[type=checkbox]{width:18px;height:18px;accent-color:var(--ink)}
+/* Checkbox (Animate UI / shadcn look): rounded box fills in, the check mark draws itself from left to right */
+input[type=checkbox]{appearance:none;padding:0;-webkit-appearance:none;flex:none;display:inline-grid;place-items:center;width:20px;height:20px;margin:0;border:1.5px solid rgba(10,10,10,.25);border-radius:6px;background:var(--white);cursor:pointer;
+  transition:background-color .2s,border-color .2s,transform .2s cubic-bezier(.34,1.56,.64,1)}
+input[type=checkbox]::before{content:"";width:12px;height:12px;background:var(--white);clip-path:inset(0 100% 0 0);transition:clip-path .28s cubic-bezier(.65,0,.35,1);
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.5 12.5l5 5L19.5 7'/%3E%3C/svg%3E") center/contain no-repeat;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.5 12.5l5 5L19.5 7'/%3E%3C/svg%3E") center/contain no-repeat}
+input[type=checkbox]:hover{border-color:var(--ink)}
+input[type=checkbox]:checked{background:var(--ink);border-color:var(--ink)}
+input[type=checkbox]:checked::before{clip-path:inset(0 0 0 0)}
+input[type=checkbox]:active{transform:scale(.88)}
+input[type=checkbox]:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+
 input[type=file]{height:auto;padding:8px;font-size:13px}
 
 /* login */
@@ -110,15 +121,45 @@ dialog[open]{animation:pop .5s var(--ease)}
 @media (max-width:900px){
   :root{--pad:12px}
   .grid-lines i:nth-child(2){display:none}
-  #app{grid-template-columns:1fr}
+  #app{grid-template-columns:minmax(0,1fr)}
+  .side{min-width:0}
   .side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;gap:16px;padding:20px}
   .side .label{display:none}
-  #tabs{flex-direction:row;flex-wrap:wrap;order:3;width:100%}
-  #tabs button{font-size:14px;padding:8px 12px}
+  #tabs{flex:none;flex-direction:row;flex-wrap:nowrap;order:3;width:calc(100% + 40px);margin:0 -20px;padding:0 20px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  #tabs::-webkit-scrollbar{display:none}
+  #tabs button{flex:none;font-size:14px;padding:8px 12px;white-space:nowrap}
   #tabs button::after{display:none}
   #logout{margin-left:auto}
   .content{padding:28px 18px 60px}
   .content-head{flex-direction:column;align-items:flex-start}
+}
+/* phones: every table row becomes a card, cells as label/value lines */
+@media (max-width:700px){
+  .side{padding:16px 20px;gap:12px}
+  .logo{font-size:16px}
+  .content{padding:24px 12px 48px}
+  .content-head{flex-direction:row;align-items:flex-end;padding-bottom:20px}
+  .content-head h1{font-size:30px}
+  .content-head .btn{flex:none}
+  .table-wrap{overflow:visible}
+  table,tbody,tr,td{display:block;width:100%}
+  tr:first-child:has(th){display:none}
+  tr{position:relative;margin-top:10px;padding:14px 16px;border-radius:16px;background:var(--white);box-shadow:0 1px 0 var(--line-l)}
+  tr:hover td{background:none}
+  td{display:flex;justify-content:space-between;align-items:baseline;gap:16px;max-width:none;padding:6px 0;border:0;white-space:normal;overflow-wrap:anywhere;text-align:right;font-size:14px}
+  td[data-label]::before{content:attr(data-label);flex:none;font-size:12px;font-weight:400;color:var(--gray);text-align:left}
+  td>span{min-width:0}
+  td.pic{justify-content:flex-start}
+  td.pic::before{display:none}
+  td.pic img{width:64px;height:64px}
+  td.act{justify-content:flex-end;gap:6px;margin-top:6px;padding-top:12px;border-top:1px dashed var(--line-l)}
+  td.act .btn{margin:0;height:36px;padding:0 14px;font-size:13px}
+  td.empty{display:block;text-align:center}
+  tr.off td:first-child::before{content:"Skryté"}
+  #form{padding:24px 20px}
+  .form-title{font-size:26px}
+  .row{position:sticky;bottom:-24px;margin:0 -20px -24px;padding:14px 20px;background:var(--page)}
+  .row .btn{flex:1}
 }
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important}}
 .form-title{font-size:32px;font-weight:600;line-height:1;text-transform:uppercase;margin:-4px 0 4px}

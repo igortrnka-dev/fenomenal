@@ -31,3 +31,11 @@ insert into products (name, sub, price, img, payment_link, sizes, sort) values
 -- Zaplatené objednávky (zapisuje Stripe webhook cez backend; bez RLS pravidiel = súkromné)
 create table if not exists orders (id bigint generated always as identity primary key, stripe_session_id text not null unique, status text not null default 'paid', email text, name text, phone text, shipping jsonb, items jsonb not null default '[]', amount_total numeric, currency text, created_at timestamptz default now());
 alter table orders enable row level security;
+-- Kedy odišiel zákazníkovi ďakovný e-mail (zabraňuje dvojitému odoslaniu)
+alter table orders add column if not exists confirmation_sent_at timestamptz;
+-- Spôsoby dopravy (ceny a poradie sa menia v admine → Doprava); kind: pickup | address | packeta
+create table if not exists shipping_methods (id bigint generated always as identity primary key, name text not null, description text, price numeric not null default 0 check (price >= 0 and price <= 1000), kind text not null default 'address' check (kind in ('pickup', 'address', 'packeta')), sort int default 0, published boolean default true, created_at timestamptz default now());
+alter table shipping_methods enable row level security;
+create policy "Public can read published shipping_methods" on shipping_methods for select to anon, authenticated using (published = true);
+alter table orders add column if not exists shipping_method jsonb;
+-- create_order_request(p) overuje aj p.shipping_method_id (a pri Packete p.shipping.packeta_id) a ukladá orders.shipping_method

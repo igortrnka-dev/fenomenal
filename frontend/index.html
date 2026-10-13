@@ -7,7 +7,7 @@
   <title>FENOMENAL — Rap Crew zo Slovenska</title>
   <meta name="description" content="Fenomenal — slovenská rap crew. Hudba, merch e-shop a galéria. Počúvaj, nakupuj, objav.">
   <link rel="preload" href="fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="img/hero-blur.jpg" as="image" fetchpriority="high">
+  <link rel="preload" as="image" type="image/avif" imagesrcset="img/hero-1200.avif 1200w, img/hero.avif 2400w" imagesizes="100vw" fetchpriority="high">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -62,10 +62,7 @@
     <!-- HERO -->
     <section class="hero card dark" data-theme="dark" id="hero">
       <div class="hero-bg" id="heroBg">
-        <!-- vopred rozmazaná verzia (namiesto živého filter: blur) -->
-        <img class="hero-blur" src="img/hero-blur.jpg" width="1200" height="1200" alt="Fenomenal crew s logom" fetchpriority="high" decoding="async">
-        <!-- ostrá vrstva, odkrytá maskou okolo kurzora -->
-        <div class="hero-focus" id="heroFocus" aria-hidden="true"><picture><source type="image/avif" srcset="img/hero-1200.avif 1200w, img/hero.avif 2400w" sizes="100vw"><img src="img/hero.jpg" srcset="img/hero-1200.jpg 1200w, img/hero.jpg 2400w" sizes="100vw" width="2400" height="2400" alt="" loading="lazy" decoding="async"></picture></div>
+        <picture><source type="image/avif" srcset="img/hero-1200.avif 1200w, img/hero.avif 2400w" sizes="100vw"><img class="hero-photo" src="img/hero-1200.jpg" srcset="img/hero-1200.jpg 1200w, img/hero.jpg 2400w" sizes="100vw" width="2400" height="2400" alt="Fenomenal crew s logom" fetchpriority="high" decoding="async"></picture>
         <!-- video pozadie len na mobile (src dopĺňa script.js, aby sa na desktope nesťahovalo) -->
         <video class="hero-video" id="heroVideo" data-src="img/hero-mobile.mp4" data-src-hevc="img/hero-mobile-hevc.mp4" poster="img/hero-mobile-poster.jpg" autoplay muted loop playsinline webkit-playsinline disablepictureinpicture preload="none" aria-hidden="true"></video>
         <!-- glitch prebliknutia ďalších fotiek (vrstvy dopĺňa script.js) -->
@@ -198,7 +195,7 @@
       </div>
       <svg class="footer-word" viewBox="0 0 1000 150" aria-hidden="true"><text x="0" y="128" textLength="1000" lengthAdjust="spacingAndGlyphs">FENOMENAL®</text></svg>
       <div class="footer-legal">
-        <p>© 2026 Fenomenal s. r. o. • Svetlá 4220/1, 811 02 Bratislava • IČO 57919429<br>Zapísaná v Obchodnom registri Mestského súdu Bratislava III, odd. Sro, vl. č. 204609/B</p>
+        <p>© 2026 Fenomenal s. r. o. • Svetlá 4220/1, 811 02 Bratislava • IČO 57919429<br>Zapísaná v Obchodnom registri Mestského súdu Bratislava III, odd. Sro, vl. č. 204609/B • <a href="mailto:legal@fenomenal.wtf">legal@fenomenal.wtf</a></p>
         <nav aria-label="Právne informácie">
           <a href="ochrana-osobnych-udajov.html">Ochrana osobných údajov</a>
           <button type="button" data-cookie-settings>Nastavenia cookies</button>
@@ -225,7 +222,16 @@
         <label class="f-city">Mesto<input name="city" autocomplete="address-level2" required maxlength="100"></label>
         <label>Krajina<select name="country" autocomplete="country" required><option value="SK">Slovensko</option><option value="CZ">Česko</option></select></label>
         <label>Firma <small>(nepovinné)</small><input name="company" autocomplete="organization" maxlength="120"></label>
-        <label class="f-full f-check"><input type="checkbox" name="ship_different"> Doručiť na inú adresu</label>
+        <fieldset class="f-full co-delivery">
+          <legend>Doprava</legend>
+          <div class="co-methods" id="coMethods"><p class="co-sub">Načítavam možnosti dopravy…</p></div>
+          <div class="co-packeta" id="coPacketa" hidden>
+            <button class="co-pick" id="coPick" type="button">Vybrať výdajné miesto</button>
+            <p class="co-point" id="coPoint"></p>
+            <input type="hidden" name="packeta_id"><input type="hidden" name="packeta_name">
+          </div>
+        </fieldset>
+        <label class="f-full f-check" id="coShipToggle" hidden><input type="checkbox" name="ship_different"> Doručiť na inú adresu</label>
         <fieldset class="f-full co-ship" id="coShip" hidden>
           <legend>Doručovacia adresa</legend>
           <label class="f-full">Meno príjemcu<input name="ship_name" autocomplete="shipping name" maxlength="120"></label>
@@ -235,11 +241,23 @@
           <label class="f-full">Krajina<select name="ship_country" autocomplete="shipping country"><option value="SK">Slovensko</option><option value="CZ">Česko</option></select></label>
         </fieldset>
         <label class="f-full">Poznámka <small>(nepovinné)</small><textarea name="note" rows="2" maxlength="500"></textarea></label>
-        <label class="f-full f-check"><input type="checkbox" name="terms" required> Oboznámil(a) som sa so <a href="ochrana-osobnych-udajov.html" target="_blank" rel="noopener">zásadami ochrany osobných údajov</a></label>
+        <label class="f-full f-check"><input type="checkbox" name="terms" required> <span>Oboznámil(a) som sa so <a href="ochrana-osobnych-udajov.html" target="_blank" rel="noopener">zásadami ochrany osobných údajov</a></span></label>
       </div>
+      <p class="co-total" id="coTotal"></p>
       <p class="co-error" id="coError" role="alert"></p>
       <button class="fx-btn std ink co-submit" type="submit" id="coSubmit">Pokračovať na platbu</button>
     </form>
+  </dialog>
+
+  <!-- Poďakovanie po zaplatení (návrat zo Stripe) -->
+  <dialog class="order thanks" id="thanksDlg" aria-labelledby="thanksTitle">
+    <div class="order-card thanks-card">
+      <button class="order-close" id="thanksClose" type="button" aria-label="Zavrieť">Zavrieť ✕</button>
+      <p class="label"><i></i><span id="thanksRef">Objednávka</span></p>
+      <h3 id="thanksTitle">Ďakujeme za nákup!</h3>
+      <p class="thanks-text" id="thanksText">Platba prebehla úspešne. CD ti čoskoro pošleme.</p>
+      <button class="fx-btn std ink" id="thanksOk" type="button">Späť na web</button>
+    </div>
   </dialog>
 
   <!-- Celé bio člena (otvára „Čítať viac“ na karte crew) -->

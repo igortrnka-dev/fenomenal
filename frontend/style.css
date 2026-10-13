@@ -140,18 +140,11 @@ h2{font-size:clamp(32px,3.35vw,48px);font-weight:600;line-height:1;text-transfor
 .hero{margin-top:6px;height:calc(100vh - 12px);min-height:640px;color:var(--white)}
 .hero-bg{position:absolute;inset:-6% 0 0;z-index:0}
 .hero-bg img{width:100%;height:100%;object-fit:cover;object-position:50% 4%;filter:contrast(1.05) brightness(.9);transform:scale(1.06)}
-.hero-bg .hero-blur{filter:none} /* blur, contrast & brightness are baked into hero-blur.jpg */
-/* sharp copy revealed in a soft circle around the cursor (--fx/--fy/--fr set from JS) */
-.hero-focus{position:absolute;inset:0;overflow:hidden;--fx:50%;--fy:50%;--fr:0px;
-  -webkit-mask-image:radial-gradient(circle var(--fr) at var(--fx) var(--fy),#000 0%,#000 45%,transparent 100%);
-  mask-image:radial-gradient(circle var(--fr) at var(--fx) var(--fy),#000 0%,#000 45%,transparent 100%)}
-@media (hover:none){.hero-focus{display:none}}
 .hero-video{display:none}
 /* glitch flashes: one full layer + three displaced slices, driven by WAAPI in script.js */
 .hero-glitch{position:absolute;inset:0;overflow:hidden;pointer-events:none}
 .hero-glitch>div{position:absolute;inset:0;opacity:0}
 .hero-glitch img{object-position:var(--gpos,50% 15%)}
-.hero-glitch .baked img{filter:none} /* hero-blur.jpg already has its grading */
 .hero-glitch .g-diff{mix-blend-mode:difference}
 .hero-shade{position:absolute;inset:0;z-index:0;background:linear-gradient(180deg,rgba(10,10,10,.15),rgba(10,10,10,0) 40%,rgba(10,10,10,.6))}
 .hero .grid-lines{z-index:1}
@@ -298,6 +291,13 @@ dialog.order::backdrop{background:rgba(10,10,10,.55)}
 .toast.show{translate:-50% 0;visibility:visible}
 
 /* ---------- responsive (Reelio breakpoints 1200 / 810) ---------- */
+/* thank-you after payment */
+dialog.thanks{width:min(560px,calc(100vw - 24px))}
+.thanks-card{display:flex;flex-direction:column;align-items:flex-start;gap:16px;padding:40px 32px 32px}
+.thanks-card h3{font-size:clamp(32px,5vw,48px);font-weight:600;line-height:1;text-transform:uppercase}
+.thanks-text{max-width:420px;font-size:16px;font-weight:400;line-height:1.5;color:var(--gray-2)}
+.thanks-text b{color:var(--ink);font-weight:600}
+.thanks-card .fx-btn{margin-top:12px}
 /* member bio: faded preview on the card + full text in a dialog */
 .member-bio{margin-top:20px;max-width:330px;max-height:9.6em;overflow:hidden;font-size:14px;font-weight:400;line-height:1.6;color:var(--light-2);-webkit-mask-image:linear-gradient(#000 45%,transparent);mask-image:linear-gradient(#000 45%,transparent)}
 .member-bio p+p{margin-top:.8em}
@@ -330,17 +330,49 @@ dialog.checkout{width:min(680px,calc(100vw - 24px))}
 .co-fields .f-full{grid-column:1/-1}
 .co-fields label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:500;color:var(--gray-2)}
 .co-fields small{font-weight:400;color:var(--gray)}
-.co-fields :is(input:not([type=checkbox]),select,textarea){width:100%;height:44px;padding:0 14px;border:1px solid var(--line-l);border-radius:8px;background:var(--white);font:inherit;font-size:16px;font-weight:400;color:var(--ink);transition:border-color .2s}
+.co-fields :is(input:not([type=checkbox],[type=radio]),select,textarea){width:100%;height:44px;padding:0 14px;border:1px solid var(--line-l);border-radius:8px;background:var(--white);font:inherit;font-size:16px;font-weight:400;color:var(--ink);transition:border-color .2s}
 .co-fields textarea{height:auto;padding:10px 14px;resize:vertical}
 .co-fields :is(input,select,textarea):focus{outline:none;border-color:var(--ink)}
 .co-fields .f-check{flex-direction:row;align-items:center;gap:10px;font-size:14px;color:var(--ink)}
-.co-fields .f-check input{width:18px;height:18px;accent-color:var(--ink);flex:none}
+/* Checkbox (Animate UI / shadcn look): rounded box fills in, the check mark draws itself from left to right */
+.co-fields .f-check input{appearance:none;-webkit-appearance:none;flex:none;display:inline-grid;place-items:center;width:20px;height:20px;margin:0;border:1.5px solid rgba(10,10,10,.25);border-radius:6px;background:var(--white);cursor:pointer;
+  transition:background-color .2s,border-color .2s,transform .2s cubic-bezier(.34,1.56,.64,1)}
+.co-fields .f-check input::before{content:"";width:12px;height:12px;background:var(--white);clip-path:inset(0 100% 0 0);transition:clip-path .28s cubic-bezier(.65,0,.35,1);
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.5 12.5l5 5L19.5 7'/%3E%3C/svg%3E") center/contain no-repeat;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.5 12.5l5 5L19.5 7'/%3E%3C/svg%3E") center/contain no-repeat}
+.co-fields .f-check input:hover{border-color:var(--ink)}
+.co-fields .f-check input:checked{background:var(--ink);border-color:var(--ink)}
+.co-fields .f-check input:checked::before{clip-path:inset(0 0 0 0)}
+.co-fields .f-check input:active{transform:scale(.88)}
+.co-fields .f-check input:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.co-fields .f-check input.invalid{border-color:#c0392b}
 .co-fields .f-check a{text-decoration:underline;text-underline-offset:2px}
 .co-fields .invalid{border-color:#c0392b!important;background:#fff6f5}
 .co-fields .f-check .invalid{outline:2px solid #c0392b;outline-offset:2px}
 .co-ship{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px;padding:16px;border:1px dashed var(--line-l);border-radius:12px}
 .co-ship[hidden]{display:none}
 .co-ship legend{padding:0 6px;font-size:12px;font-weight:600;color:var(--ink)}
+.co-delivery{display:flex;flex-direction:column;gap:10px;border:0}
+.co-delivery legend{margin-bottom:8px;font-size:12px;font-weight:500;color:var(--gray-2)}
+.co-methods{display:flex;flex-direction:column;gap:8px}
+.co-fields .co-method{flex-direction:row;display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line-l);border-radius:10px;background:var(--white);cursor:pointer;transition:border-color .2s}
+.co-method:has(input:checked){border-color:var(--ink)}
+.co-method input{appearance:none;-webkit-appearance:none;flex:none;width:20px;height:20px;margin:0;border:1.5px solid rgba(10,10,10,.25);border-radius:50%;background:var(--white);cursor:pointer;
+  transition:border-color .2s,border-width .25s cubic-bezier(.34,1.56,.64,1),transform .2s cubic-bezier(.34,1.56,.64,1)}
+.co-method input:checked{border:6px solid var(--ink)}
+.co-method input:active{transform:scale(.88)}
+.co-method input:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.co-method span{flex:1;display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px;font-size:15px;font-weight:500;color:var(--ink)}
+.co-method small{font-size:13px;font-weight:400;color:var(--gray-2)}
+.co-method em{flex:none;font-style:normal;font-size:15px;font-weight:600;color:var(--ink)}
+.co-methods.invalid .co-method{border-color:#c0392b}
+.co-packeta{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:12px 14px;border:1px dashed var(--line-l);border-radius:10px}
+.co-packeta[hidden]{display:none}
+.co-pick{height:38px;padding:0 16px;border-radius:8px;background:var(--ink);color:var(--white);font-size:14px;font-weight:500}
+.co-pick.invalid{outline:2px solid #c0392b;outline-offset:2px}
+.co-point{flex:1;min-width:180px;font-size:14px;font-weight:400;line-height:1.4;color:var(--ink)}
+.co-total{margin-top:16px;font-size:14px;font-weight:400;color:var(--gray-2)}
+.co-total b{color:var(--ink);font-weight:600}
 .co-error{min-height:20px;margin-top:14px;font-size:14px;color:#c0392b}
 .co-submit{width:100%;height:48px;margin-top:6px}
 
@@ -414,4 +446,22 @@ dialog.checkout{width:min(680px,calc(100vw - 24px))}
 @media (prefers-reduced-motion:reduce){
   html{scroll-behavior:auto}
   *,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important}
+}
+
+/* Scroll-linked effects run as CSS scroll-driven animations (off the main thread).
+   Browsers without support simply show the final state. */
+@supports (animation-timeline: view()) {
+  @keyframes st-scale-12 { from { transform: scale(1.2) } }
+  @keyframes st-scale-14 { from { transform: scale(1.4) } }
+  @keyframes st-fade { from { opacity: 0 } }
+  @keyframes hero-parallax { to { translate: 0 200px } }
+  [data-st-scale="1.2,1"], [data-st-scale="1.4,1"], [data-st-opacity="0,1"] {
+    animation: st-scale-12 linear both; animation-timeline: view(); animation-range: entry 0% entry 100%;
+  }
+  [data-st-scale="1.4,1"] { animation-name: st-scale-14 }
+  [data-st-opacity="0,1"] { animation-name: st-fade }
+  .hero-bg { animation: hero-parallax linear both; animation-timeline: scroll(root); animation-range: 0px 1000px }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-st-scale], [data-st-opacity], .hero-bg { animation: none !important }
 }
