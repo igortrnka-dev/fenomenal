@@ -25,10 +25,12 @@ async function api(path, opts = {}) {
 const imgSrc = u => !u ? '' : /^https?:/.test(u) ? u : `${(window.FEN_CONFIG.SITE_URL || '')}/${u}`;
 
 /* ---------- auth ---------- */
+// tolerate a pasted list line ("1. fen-…"), spaces or line breaks around the key
+const cleanKey = v => (v.match(/fen-[A-Za-z0-9]{7}(?:-[A-Za-z0-9]{7}){3}/) || [v.trim()])[0];
 $('#loginForm').onsubmit = async e => {
   e.preventDefault(); $('#loginErr').textContent = '';
   try {
-    const r = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: $('#key').value }) });
+    const r = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: cleanKey($('#key').value) }) });
     const d = await r.json(); if (!r.ok) throw new Error(d.error);
     token = d.token; sessionStorage.setItem('fen-token', token); start();
   } catch (err) { $('#loginErr').textContent = err.message; }
