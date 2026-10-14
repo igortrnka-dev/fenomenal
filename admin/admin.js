@@ -115,6 +115,8 @@ function openForm(r) {
       : type === 'select' ? `<select name="${k}">${opts.map(o => `<option ${o === v ? 'selected' : ''}>${o}</option>`).join('')}</select>`
       : type === 'image' ? `<div class="upl"><img src="${esc(imgSrc(v))}" alt=""><input type="file" accept="image/*" data-up="${k}"><input type="hidden" name="${k}" value="${esc(v)}"></div>`
       : type === 'sizes' ? `<input name="${k}" value="${esc((v || ['S', 'M', 'L', 'XL']).join(','))}">`
+      // step: price allows cents (default step=1 would reject 4,90 €); other numbers (sort) stay whole
+      : type === 'number' ? `<input name="${k}" type="number" step="${k === 'price' ? '0.01' : '1'}" value="${esc(v)}">`
       : `<input name="${k}" type="${type}" value="${esc(v)}">`;
     return `<label>${label}${input}</label>`;
   }).join('') + `<label class="chk"><input type="checkbox" name="published" ${!r || r.published ? 'checked' : ''}> Zverejnené</label>
