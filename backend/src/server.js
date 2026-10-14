@@ -467,6 +467,7 @@ app.post('/api/auth/login', limit('login', 5, 15 * 60_000), noStore, wrap(async 
   if (!isStr(key) || key.length > 200) throw fail(400, 'Neplatný kľúč');
   const hash = sha256(key.trim());
   if (!adminKeys.some(h => sameStr(h, hash))) throw fail(401, 'Neplatný kľúč');
+  hits.delete(`login:${req.ip}`); // only failed attempts count toward the limit
   // token = <key id>.<expiry>.<hmac>; the key id lets a removed key revoke its sessions
   const payload = `${hash.slice(0, 16)}.${Date.now() + SESSION_TTL}`;
   res.json({ token: `${payload}.${sign(payload)}` });

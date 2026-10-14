@@ -36,12 +36,19 @@ const imgSrc = u => !u ? '' : /^https?:/.test(u) ? u : `${(window.FEN_CONFIG.SIT
 // tolerate a pasted list line ("1. fen-…"), spaces or line breaks around the key
 const cleanKey = v => (v.match(/fen-[A-Za-z0-9]{7}(?:-[A-Za-z0-9]{7}){3}/) || [v.trim()])[0];
 $('#loginForm').onsubmit = async e => {
-  e.preventDefault(); $('#loginErr').textContent = '';
+  e.preventDefault();
+  const btn = e.submitter || $('#loginForm button');
+  if (btn.disabled) return;
+  // a sleeping Render backend needs up to a minute to wake; show it instead of a dead button
+  btn.disabled = true; btn.textContent = 'Prihlasujem…'; $('#loginErr').textContent = '';
+  const slow = setTimeout(() => { $('#loginErr').textContent = 'Server sa prebúdza, môže to trvať do minúty…'; }, 4000);
   try {
     const r = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: cleanKey($('#key').value) }) });
-    const d = await r.json(); if (!r.ok) throw new Error(d.error);
+    const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || `Chyba servera (${r.status})`);
+    $('#loginErr').textContent = '';
     token = d.token; sessionStorage.setItem('fen-token', token); start();
-  } catch (err) { $('#loginErr').textContent = err.message; }
+  } catch (err) { $('#loginErr').textContent = err.message === 'Failed to fetch' ? 'Server je nedostupný, skús to znova.' : err.message; }
+  finally { clearTimeout(slow); btn.disabled = false; btn.textContent = 'Prihlásiť'; }
 };
 function logout() { token = null; sessionStorage.removeItem('fen-token'); $('#app').hidden = true; $('#login').hidden = false; }
 $('#logout').onclick = logout;
